@@ -35,6 +35,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - twinpin
+    - monad-loops
 
 tests:
   twinpin-test:
