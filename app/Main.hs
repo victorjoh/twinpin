@@ -1,27 +1,18 @@
 module Main where
-import           Control.Monad.Loops
+
+import           SDL
+import           Control.Concurrent             ( threadDelay )
 
 main :: IO ()
-main = iterateUntilM_ shouldExit displayLoop initWorld
+main = do
+    initialize [InitJoystick]
+    joysticks <- availableJoysticks
+    mapM_ openJoystick joysticks
+    printEvents
 
-iterateUntilM_ :: Monad m => (a -> Bool) -> (a -> m a) -> a -> m ()
-iterateUntilM_ p f v = do
-    iterateUntilM p f v
-    return ()
-
-displayLoop :: Int -> IO Int
-displayLoop w = do
-    displayWorld w
-    return (gameLoop w)
-
-shouldExit :: Int -> Bool
-shouldExit i = 10 < i
-
-initWorld :: Int
-initWorld = 0
-
-gameLoop :: Int -> Int
-gameLoop = (+) 1
-
-displayWorld :: Int -> IO ()
-displayWorld = print
+printEvents :: IO ()
+printEvents = do
+    threadDelay 15000
+    events <- pollEvents
+    mapM_ print events
+    printEvents
