@@ -20,12 +20,25 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/victorjoh/twinpin#readme>
 
 dependencies:
-- base >= 4.7 && < 5
+- base >= 4.12 && < 5
+
+custom-setup:
+  dependencies:
+  - base >= 4.12 && < 5
+  - Cabal >= 2.4
+  - JuicyPixels
+  - svg-tree
+  - rasterific-svg
+  - system-filepath
+  - directory
+
+data-files: gen/*.bmp
 
 library:
   source-dirs: src
   dependencies:
   - sdl2
+  - containers
 
 executables:
   twinpin-exe:
@@ -38,6 +51,7 @@ executables:
     dependencies:
     - twinpin
     - sdl2
+    - containers
 
 tests:
   twinpin-test:

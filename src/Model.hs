@@ -7,13 +7,17 @@ import           Data.Word                      ( Word8
                                                 , Word32
                                                 )
 import           Foreign.C.Types
+import qualified Data.Map.Strict               as Map
 
-data Model = Model Time Player deriving (Show)
+data Model = Model Time Player
 
-initModel :: Model
-initModel = Model 0 initPlayer
+getModelImages :: [FilePath]
+getModelImages = getPlayerImages
 
-drawModel :: Model -> [(V4 Word8, Maybe (Rectangle CInt))]
+initModel :: Map.Map FilePath Texture -> Model
+initModel textureMap = Model 0 $ initPlayer textureMap
+
+drawModel :: Model -> [(Texture, Maybe (Rectangle CInt))]
 drawModel (Model _ p) = drawPlayer p
 
 updateModel :: Model -> [Event] -> Word32 -> Model

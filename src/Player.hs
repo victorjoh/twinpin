@@ -1,5 +1,6 @@
 module Player
     ( Player
+    , getPlayerImages
     , initPlayer
     , drawPlayer
     , updatePlayer
@@ -12,25 +13,33 @@ import           Data.Word                      ( Word8
                                                 , Word32
                                                 )
 import           Foreign.C.Types
+import qualified Data.Map.Strict               as Map
+import           Data.Maybe                     ( fromJust )
 
 type Position1D = Float
 type Velocity1D = Float
-data Position2D = Position2D Position1D Position1D deriving (Show)
-data Velocity2D = Velocity2D Velocity1D Velocity1D deriving (Show)
-data Player = Player Position2D Velocity2D deriving (Show)
+data Position2D = Position2D Position1D Position1D
+data Velocity2D = Velocity2D Velocity1D Velocity1D
+data Player = Player Position2D Velocity2D Texture
 
-initPlayer :: Player
-initPlayer = (Player (Position2D 0 0) (Velocity2D 0 0))
+textureFile :: FilePath
+textureFile = "gen/player.bmp"
 
-drawPlayer :: Player -> [(V4 Word8, Maybe (Rectangle CInt))]
-drawPlayer (Player (Position2D x y) _) =
-    [ ( V4 maxBound maxBound maxBound maxBound
-      , Just (Rectangle (P (V2 (round x) (round y))) (V2 10 10))
-      )
-    ]
+getPlayerImages :: [FilePath]
+getPlayerImages = [textureFile]
+
+initPlayer :: Map.Map FilePath Texture -> Player
+initPlayer textureMap = Player
+    (Position2D 0 0)
+    (Velocity2D 0 0)
+    (fromJust (Map.lookup textureFile textureMap))
+
+drawPlayer :: Player -> [(Texture, Maybe (Rectangle CInt))]
+drawPlayer (Player (Position2D x y) _ t) =
+    [(t, Just (Rectangle (P (V2 (round x) (round y))) (V2 32 32)))]
 
 updatePlayer :: Player -> [Event] -> DeltaTime -> Player
-updatePlayer (Player p v) es td = Player (updatePosition2D p v' td) v'
+updatePlayer (Player p v t) es td = Player (updatePosition2D p v' td) v' t
     where v' = foldl updateVelocity v es
 
 updateVelocity :: Velocity2D -> Event -> Velocity2D
