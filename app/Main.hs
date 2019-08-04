@@ -40,15 +40,17 @@ appendTexture renderer textureMap textureFile = do
 
 gameLoop :: Renderer -> Model -> IO ()
 gameLoop renderer m = do
-    threadDelay 15000
+    threadDelay 20000
     events            <- pollEvents
     msSinceSdlLibInit <- ticks
     let newM = updateModel m events msSinceSdlLibInit
-    rendererDrawColor renderer $= V4 0 0 0 maxBound
+    rendererDrawColor renderer $= V4 34 11 21 maxBound
     clear renderer
     mapM_ (draw renderer) $ drawModel newM
     present renderer
     gameLoop renderer newM
 
-draw :: Renderer -> (Texture, Maybe (Rectangle CInt)) -> IO ()
-draw renderer (texture, destination) = copy renderer texture Nothing destination
+draw :: Renderer -> (Texture, Maybe (Rectangle CInt), CDouble) -> IO ()
+draw renderer (texture, destination, rotation) =
+    copyEx renderer texture Nothing destination rotation Nothing
+        $ V2 False False

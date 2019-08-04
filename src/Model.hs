@@ -17,7 +17,7 @@ getModelImages = getPlayerImages
 initModel :: Map.Map FilePath Texture -> Model
 initModel textureMap = Model 0 $ initPlayer textureMap
 
-drawModel :: Model -> [(Texture, Maybe (Rectangle CInt))]
+drawModel :: Model -> [(Texture, Maybe (Rectangle CInt), CDouble)]
 drawModel (Model _ p) = drawPlayer p
 
 updateModel :: Model -> [Event] -> Word32 -> Model
