@@ -12,11 +12,14 @@ import           Paths_twinpin
 import qualified Data.Map.Strict               as Map
 import           Control.Monad
 
+backgroundColor = V4 34 11 21
+windowSize' = V2 800 600
+
 main :: IO ()
 main = do
     initialize [InitJoystick, InitVideo]
     window <- createWindow "twinpin"
-                           defaultWindow { windowInitialSize = V2 800 600 }
+                           defaultWindow { windowInitialSize = windowSize' }
     renderer <- createRenderer window (-1) defaultRenderer
     showWindow window
 
@@ -43,8 +46,8 @@ gameLoop renderer m = do
     threadDelay 20000
     events            <- pollEvents
     msSinceSdlLibInit <- ticks
-    let newM = updateModel m events msSinceSdlLibInit
-    rendererDrawColor renderer $= V4 34 11 21 maxBound
+    let newM = updateModel m events msSinceSdlLibInit windowSize'
+    rendererDrawColor renderer $= backgroundColor maxBound
     clear renderer
     mapM_ (draw renderer) $ drawModel newM
     present renderer

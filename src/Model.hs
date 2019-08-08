@@ -2,6 +2,7 @@ module Model where
 
 import           Time
 import           Player
+import           Space
 import           SDL
 import           Data.Word                      ( Word8
                                                 , Word32
@@ -20,6 +21,8 @@ initModel textureMap = Model 0 $ initPlayer textureMap
 drawModel :: Model -> [(Texture, Maybe (Rectangle CInt), CDouble)]
 drawModel (Model _ p) = drawPlayer p
 
-updateModel :: Model -> [Event] -> Word32 -> Model
-updateModel (Model t p) es tw' = Model t' $ updatePlayer p es (t' - t)
-    where t' = fromIntegral tw'
+updateModel :: Model -> [Event] -> Word32 -> V2 CInt -> Model
+updateModel (Model t p) es tw' (V2 x y) =
+    Model t' $ updatePlayer p es (t' - t)
+        (Bounds2D (0, fromIntegral x) (0, fromIntegral y))
+            where t' = fromIntegral tw'
