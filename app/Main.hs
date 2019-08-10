@@ -27,6 +27,7 @@ main = do
     mapM_ openJoystick joysticks
 
     textureMap <- foldM (appendTexture renderer) Map.empty getModelImages
+    mapM_ (print . fst) (Map.toList textureMap)
     gameLoop renderer $ initModel textureMap
 
 appendTexture
@@ -42,16 +43,16 @@ appendTexture renderer textureMap textureFile = do
     return $ Map.insert textureFile texture textureMap
 
 gameLoop :: Renderer -> Model -> IO ()
-gameLoop renderer m = do
+gameLoop renderer model = do
     threadDelay 20000
     events            <- pollEvents
     msSinceSdlLibInit <- ticks
-    let newM = updateModel m events msSinceSdlLibInit windowSize'
+    let newModel = updateModel model events msSinceSdlLibInit windowSize'
     rendererDrawColor renderer $= backgroundColor maxBound
     clear renderer
-    mapM_ (draw renderer) $ drawModel newM
+    mapM_ (draw renderer) $ drawModel newModel
     present renderer
-    gameLoop renderer newM
+    gameLoop renderer newModel
 
 draw :: Renderer -> (Texture, Maybe (Rectangle CInt), CDouble) -> IO ()
 draw renderer (texture, destination, rotation) =

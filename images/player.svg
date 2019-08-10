@@ -25,9 +25,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
-     inkscape:zoom="64"
-     inkscape:cx="11.5171"
-     inkscape:cy="30.818935"
+     inkscape:zoom="16"
+     inkscape:cx="-0.85789999"
+     inkscape:cy="15.818935"
      inkscape:document-units="mm"
      inkscape:current-layer="layer2"
      showgrid="false"
@@ -68,27 +68,29 @@
     <circle
        style="fill:#d35f5f;stroke-width:0.23158093"
        id="path21"
-       cx="4.2333331"
-       cy="4.2332449"
-       r="1.4111111" />
+       cx="4.2333322"
+       cy="-4.2333331"
+       r="1.4111111"
+       transform="rotate(90)" />
     <path
        style="fill:#d35f5f;stroke-width:0.26440066"
        id="path19"
        sodipodi:type="arc"
-       sodipodi:cx="4.2952151"
-       sodipodi:cy="4.1782298"
+       sodipodi:cx="4.1853657"
+       sodipodi:cy="-4.2876348"
        sodipodi:rx="4.227489"
        sodipodi:ry="4.2333331"
        sodipodi:start="4.3577034"
        sodipodi:end="5.0376043"
-       d="m 2.8270271,0.20839742 a 4.227489,4.2333331 0 0 1 2.818925,-0.0415977 L 4.2952151,4.1782298 Z"
-       transform="rotate(0.74340354)" />
+       d="m 2.7171776,-8.2574672 a 4.227489,4.2333331 0 0 1 2.818925,-0.041598 l -1.3507369,4.0114301 z"
+       transform="rotate(90.7434)" />
     <rect
        style="fill:#d35f5f;stroke-width:0.25821653"
        id="rect28"
        width="2.8222222"
        height="3.9905386"
        x="2.8222222"
-       y="0.24279492" />
+       y="-8.2237835"
+       transform="rotate(90)" />
   </g>
 </svg>
