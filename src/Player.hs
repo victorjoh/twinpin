@@ -1,7 +1,7 @@
 module Player
     ( Player
     , playerTextureFile
-    , initPlayer
+    , createPlayer
     , drawPlayer
     , updatePlayer
     , triggerShot
@@ -36,8 +36,8 @@ size = V2 side side
 playerTextureFile :: FilePath
 playerTextureFile = "gen/player.bmp"
 
-initPlayer :: Map.Map FilePath Texture -> Player
-initPlayer textureMap = Player
+createPlayer :: Map.Map FilePath Texture -> Player
+createPlayer textureMap = Player
     (Shape (size / 2)
            (V2 0 0)
            (fromJust (Map.lookup playerTextureFile textureMap)))
@@ -46,45 +46,45 @@ initPlayer textureMap = Player
 drawPlayer :: Player -> (Texture, Maybe (Rectangle CInt), CDouble)
 drawPlayer (Player shape (Aim2D _ _ angle)) = drawShape shape angle size
 
-angle' :: Direction1D -> Direction1D -> Angle2D -> Angle2D
-angle' 0 0 r = r
-angle' x y r | isTooSmall x && isTooSmall y = r
-             | otherwise = (atan2 y x) * (180 / pi)
-        where isTooSmall c = (abs c) < 5000
+createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
+createAngle 0 0 oldAngle = oldAngle
+createAngle x y oldAngle | isTooSmall x && isTooSmall y = oldAngle
+                         | otherwise = (atan2 y x) * (180 / pi)
+        where isTooSmall direction = (abs direction) < 5000
 
 updatePlayer :: Player -> [Event] -> DeltaTime -> Bounds2D -> Player
-updatePlayer (Player (Shape p v t) a) es td bounds = Player (Shape p' v' t) a'
+updatePlayer (Player (Shape position velocity texture) aim) events dt bounds =
+    Player (Shape newPosition newVelocity texture) newAim
     where
-        v' = foldl updateVelocity v es
-        a' = foldl updateAim a es
-        p' = limitPosition2D (updatePosition2D p v' td)
-                             (decreaseBounds2D bounds size)
+        newVelocity = foldl updateVelocity velocity events
+        newAim = foldl updateAim aim events
+        newPosition = limitPosition2D (updatePosition2D position newVelocity dt)
+                                      (decreaseBounds2D bounds size)
 
 
 triggerShot :: Player -> [Event] -> Map.Map FilePath Texture -> Maybe Shot
-triggerShot (Player (Shape pos _ _) (Aim2D _ _ angle)) events textureMap
-    | any isTriggerEvent events = Just $ initShot pos angle textureMap
+triggerShot (Player (Shape position _ _) (Aim2D _ _ angle)) events textureMap
+    | any isTriggerEvent events = Just $ createShot position angle textureMap
     | otherwise = Nothing
 
 isTriggerEvent :: Event -> Bool
 isTriggerEvent (Event _ (JoyButtonEvent (JoyButtonEventData _ 5 JoyButtonPressed))) = True
 isTriggerEvent _ = False
 
--- TODO: this is similar to updateVelocity
 updateAim :: Aim2D -> Event -> Aim2D
-updateAim (Aim2D x y r) (Event _ (JoyAxisEvent (JoyAxisEventData _ axis pos)))
-    = let pos' = fromIntegral pos
+updateAim (Aim2D x y angle) (Event _ (JoyAxisEvent (JoyAxisEventData _ axis position)))
+    = let pos = fromIntegral position
       in  case axis of
-              3 -> Aim2D pos' y $ angle' pos' y r
-              4 -> Aim2D x pos' $ angle' x pos' r
-              _ -> Aim2D x y r
+              3 -> Aim2D pos y $ createAngle pos y angle
+              4 -> Aim2D x pos $ createAngle x pos angle
+              _ -> Aim2D x y angle
 updateAim aim _ = aim
 
 updateVelocity :: Velocity2D -> Event -> Velocity2D
-updateVelocity (V2 x y) (Event _ (JoyAxisEvent (JoyAxisEventData _ axis pos)))
-    = let pos' = (0.00001 * fromIntegral pos)
+updateVelocity (V2 x y) (Event _ (JoyAxisEvent (JoyAxisEventData _ axis position)))
+    = let pos = (0.00001 * fromIntegral position)
       in  case axis of
-              0 -> V2 pos' y
-              1 -> V2 x pos'
+              0 -> V2 pos y
+              1 -> V2 x pos
               _ -> V2 x y
-updateVelocity v _ = v
+updateVelocity velocity _ = velocity

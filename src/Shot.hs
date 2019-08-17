@@ -1,7 +1,7 @@
 module Shot
     ( Shot
     , shotTextureFile
-    , initShot
+    , createShot
     , drawShot
     , updateShot
     , isShotWithinBounds
@@ -29,8 +29,8 @@ size = V2 side side
 shotTextureFile :: FilePath
 shotTextureFile = "gen/shot.bmp"
 
-initShot :: Position2D -> Angle2D -> Map.Map FilePath Texture -> Shot
-initShot position angle textureMap = Shot $ Shape
+createShot :: Position2D -> Angle2D -> Map.Map FilePath Texture -> Shot
+createShot position angle textureMap = Shot $ Shape
     position
     (toVelocity angle shotSpeed)
     (fromJust (Map.lookup shotTextureFile textureMap))

@@ -28,7 +28,7 @@ main = do
 
     textureMap <- foldM (appendTexture renderer) Map.empty getModelImages
     mapM_ (print . fst) (Map.toList textureMap)
-    gameLoop renderer $ initModel textureMap
+    gameLoop renderer $ createModel textureMap
 
 appendTexture
     :: Renderer

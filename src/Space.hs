@@ -18,8 +18,8 @@ type Size2D = V2 Size1D
 data Bounds2D = Bounds2D Bounds1D Bounds1D
 
 toVelocity :: Angle2D -> Speed -> Velocity2D
-toVelocity r s = V2 (axisVelocity cos) (axisVelocity sin)
-    where axisVelocity trig = (s * (trig ((pi / 180) * r)))
+toVelocity angle speed = V2 (axisVelocity cos) (axisVelocity sin)
+    where axisVelocity trig = (speed * (trig ((pi / 180) * angle)))
 
 toPixelPoint :: Position2D -> Point V2 CInt
 toPixelPoint (V2 x y) = P $ V2 (round x) (round y)

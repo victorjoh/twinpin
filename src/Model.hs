@@ -17,20 +17,23 @@ data Model = Model Time Player [Shot] (Map.Map FilePath Texture)
 getModelImages :: [FilePath]
 getModelImages = [playerTextureFile, shotTextureFile]
 
-initModel :: Map.Map FilePath Texture -> Model
-initModel textureMap = Model 0 (initPlayer textureMap) [] textureMap
+createModel :: Map.Map FilePath Texture -> Model
+createModel textureMap = Model 0 (createPlayer textureMap) [] textureMap
 
 drawModel :: Model -> [(Texture, Maybe (Rectangle CInt), CDouble)]
-drawModel (Model _ p shots _) = drawPlayer p : map drawShot shots
+drawModel (Model _ player shots _) = drawPlayer player : map drawShot shots
 
 updateModel :: Model -> [Event] -> Word32 -> V2 CInt -> Model
-updateModel (Model t p shots textureMap) es tw' (V2 x y) = Model
-    t' p' (
-            map (flip updateShot td)
-                    (filter (flip isShotWithinBounds bounds) shots)
-            ++ (maybeToList (triggerShot p' es textureMap))
-        ) textureMap
-            where t' = fromIntegral tw'
-                  td = (t' - t)
-                  bounds = Bounds2D (0, fromIntegral x) (0, fromIntegral y)
-                  p' = updatePlayer p es td bounds
+updateModel (Model t player shots textureMap) events newWordTime (V2 bx by) =
+    Model
+        newT
+        newPlayer
+        (filter (flip isShotWithinBounds bounds)
+            (map (flip updateShot dt)
+                (shots ++
+                    (maybeToList (triggerShot newPlayer events textureMap)))))
+        textureMap
+            where newT = fromIntegral newWordTime
+                  dt = (newT - t)
+                  bounds = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
+                  newPlayer = updatePlayer player events dt bounds
