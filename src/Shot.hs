@@ -4,52 +4,44 @@ module Shot
     , initShot
     , drawShot
     , updateShot
-    , shotOutsideBounds
+    , isShotWithinBounds
     )
 where
 
-import Time
-import Space
+import           Time
+import           Space
+import           Shape
 import           Foreign.C.Types
 import           SDL
 import qualified Data.Map.Strict               as Map
 import           Data.Maybe                     ( fromJust )
 
-data Shot = Shot Position2D Velocity2D Texture
+newtype Shot = Shot Shape
 
 shotSpeed = 0.7
 
 side :: Size1D
 side = 32 / 3
 
+size :: Size2D
+size = V2 side side
+
 shotTextureFile :: FilePath
 shotTextureFile = "gen/shot.bmp"
 
-initShot :: Position2D -> Rotation2D -> Map.Map FilePath Texture -> Shot
-initShot position angle textureMap = Shot
+initShot :: Position2D -> Angle2D -> Map.Map FilePath Texture -> Shot
+initShot position angle textureMap = Shot $ Shape
     position
     (toVelocity angle shotSpeed)
     (fromJust (Map.lookup shotTextureFile textureMap))
 
 drawShot :: Shot -> (Texture, Maybe (Rectangle CInt), CDouble)
-drawShot (Shot (Position2D x y) _ texture) =
-    ( texture
-    , Just (Rectangle
-            (P (V2 (round (x - side/2)) (round (y - side/2))))
-            (V2 (round side) (round side)))
-    , 0
-    )
+drawShot (Shot shape) = drawShape shape 0 size
 
 updateShot :: Shot -> DeltaTime -> Shot
-updateShot (Shot (Position2D xp yp) (Velocity2D xv yv) texture) td = Shot
-    (Position2D (xp + xv * (fromIntegral td)) (yp + yv * (fromIntegral td)))
-    (Velocity2D xv yv)
-    texture
+updateShot (Shot (Shape position velocity texture)) dt =
+    Shot $ Shape (updatePosition2D position velocity dt) velocity texture
 
-shotOutsideBounds :: Shot -> Bounds2D -> Bool
-shotOutsideBounds (Shot (Position2D xp yp) _ _) (Bounds2D xb yb) =
-    shotOutsideBounds1D xp xb || shotOutsideBounds1D yp yb
-
-shotOutsideBounds1D :: Position1D -> Bounds1D -> Bool
-shotOutsideBounds1D pos (lower, upper) =
-    pos + side/2 < lower || pos - side/2 > upper
+isShotWithinBounds :: Shot -> Bounds2D -> Bool
+isShotWithinBounds (Shot (Shape position _ _)) bounds =
+    isWithinBounds2D position $ increaseBounds2D bounds size

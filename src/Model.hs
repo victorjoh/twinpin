@@ -27,7 +27,7 @@ updateModel :: Model -> [Event] -> Word32 -> V2 CInt -> Model
 updateModel (Model t p shots textureMap) es tw' (V2 x y) = Model
     t' p' (
             map (flip updateShot td)
-                    (filter (not . flip shotOutsideBounds bounds) shots)
+                    (filter (flip isShotWithinBounds bounds) shots)
             ++ (maybeToList (triggerShot p' es textureMap))
         ) textureMap
             where t' = fromIntegral tw'
