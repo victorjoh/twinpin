@@ -1,4 +1,6 @@
 # twinpin
+![twinpin screenshot](images/screenshot.png "twinpin screenshot")
+
 twinpin is a minimal twin-stick arena shooter. I develop this game to satisfy my
 functional programming itch.
 
