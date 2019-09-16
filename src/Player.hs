@@ -40,7 +40,8 @@ createPlayer :: Map.Map FilePath Texture -> Player
 createPlayer textureMap = Player
     (Shape (size / 2)
            (V2 0 0)
-           (fromJust (Map.lookup playerTextureFile textureMap)))
+           (fromJust (Map.lookup playerTextureFile textureMap))
+    )
     (Aim2D 0 1 0)
 
 drawPlayer :: Player -> (Texture, Maybe (Rectangle CInt), CDouble)
@@ -50,25 +51,27 @@ createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle
 createAngle x y oldAngle | isTooSmall x && isTooSmall y = oldAngle
                          | otherwise = (atan2 y x) * (180 / pi)
-        where isTooSmall direction = (abs direction) < 5000
+    where isTooSmall direction = (abs direction) < 5000
 
 updatePlayer :: Player -> [Event] -> DeltaTime -> Bounds2D -> Player
 updatePlayer (Player (Shape position velocity texture) aim) events dt bounds =
     Player (Shape newPosition newVelocity texture) newAim
-    where
-        newVelocity = foldl updateVelocity velocity events
-        newAim = foldl updateAim aim events
-        newPosition = limitPosition2D (updatePosition2D position newVelocity dt)
-                                      (decreaseBounds2D bounds size)
+  where
+    newVelocity = foldl updateVelocity velocity events
+    newAim      = foldl updateAim aim events
+    newPosition = limitPosition2D
+        (updatePosition2D position newVelocity dt)
+        (decreaseBounds2D bounds size)
 
 
 triggerShot :: Player -> [Event] -> Map.Map FilePath Texture -> Maybe Shot
 triggerShot (Player (Shape position _ _) (Aim2D _ _ angle)) events textureMap
     | any isTriggerEvent events = Just $ createShot position angle textureMap
-    | otherwise = Nothing
+    | otherwise                 = Nothing
 
 isTriggerEvent :: Event -> Bool
-isTriggerEvent (Event _ (JoyButtonEvent (JoyButtonEventData _ 5 JoyButtonPressed))) = True
+isTriggerEvent (Event _ (JoyButtonEvent (JoyButtonEventData _ 5 JoyButtonPressed)))
+    = True
 isTriggerEvent _ = False
 
 updateAim :: Aim2D -> Event -> Aim2D

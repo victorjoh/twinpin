@@ -15,8 +15,6 @@ drawShape
     -> (Texture, Maybe (Rectangle CInt), CDouble)
 drawShape (Shape position _ texture) angle size =
     ( texture
-    , Just (Rectangle
-            (toPixelPoint (position - size / 2))
-            (toPixelSize size))
+    , Just (Rectangle (toPixelPoint (position - size / 2)) (toPixelSize size))
     , toPixelAngle angle
     )

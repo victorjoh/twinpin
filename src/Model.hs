@@ -24,16 +24,22 @@ drawModel :: Model -> [(Texture, Maybe (Rectangle CInt), CDouble)]
 drawModel (Model _ player shots _) = drawPlayer player : map drawShot shots
 
 updateModel :: Model -> [Event] -> Word32 -> V2 CInt -> Model
-updateModel (Model t player shots textureMap) events newWordTime (V2 bx by) =
-    Model
-        newT
+updateModel (Model time player shots textureMap) events newWordTime (V2 bx by)
+    = Model
+        newTime
         newPlayer
-        (filter (flip isShotWithinBounds bounds)
-            (map (flip updateShot dt)
-                (shots ++
-                    (maybeToList (triggerShot newPlayer events textureMap)))))
+        (filter
+            (flip isShotWithinBounds bounds)
+            (map
+                (flip updateShot passedTime)
+                (  shots
+                ++ (maybeToList (triggerShot newPlayer events textureMap))
+                )
+            )
+        )
         textureMap
-            where newT = fromIntegral newWordTime
-                  dt = (newT - t)
-                  bounds = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
-                  newPlayer = updatePlayer player events dt bounds
+  where
+    newTime    = fromIntegral newWordTime
+    passedTime = newTime - time
+    bounds     = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
+    newPlayer  = updatePlayer player events passedTime bounds
