@@ -52,7 +52,7 @@ gameLoop renderer model = do
     clear renderer
     mapM_ (draw renderer) $ drawModel newModel
     present renderer
-    gameLoop renderer newModel
+    unless (isFinished newModel) (gameLoop renderer newModel)
 
 draw :: Renderer -> (Texture, Maybe (Rectangle CInt), CDouble) -> IO ()
 draw renderer (texture, destination, rotation) =
