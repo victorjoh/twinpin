@@ -63,3 +63,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - twinpin
+    - hspec
+    - sdl2

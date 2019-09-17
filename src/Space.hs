@@ -15,7 +15,7 @@ type Angle2D = Float
 type Position2D = V2 Position1D
 type Velocity2D = V2 Velocity1D
 type Size2D = V2 Size1D
-data Bounds2D = Bounds2D Bounds1D Bounds1D
+data Bounds2D = Bounds2D Bounds1D Bounds1D deriving (Show, Eq)
 
 toVelocity :: Angle2D -> Speed -> Velocity2D
 toVelocity angle speed = V2 (axisVelocity cos) (axisVelocity sin)
@@ -49,16 +49,15 @@ limitPosition1D :: Position1D -> Bounds1D -> Position1D
 limitPosition1D position (lowerBound, upperBound) =
     max lowerBound $ min upperBound position
 
-decreaseBounds2D :: Bounds2D -> Size2D -> Bounds2D
-decreaseBounds2D (Bounds2D bx by) (V2 sx sy) =
-    Bounds2D (decreaseBounds1D bx sx) (decreaseBounds1D by sy)
-
-decreaseBounds1D :: Bounds1D -> Size1D -> Bounds1D
-decreaseBounds1D (lower, upper) size = (lower + size / 2, upper - size / 2)
-
 increaseBounds2D :: Bounds2D -> Size2D -> Bounds2D
 increaseBounds2D (Bounds2D bx by) (V2 sx sy) =
     Bounds2D (increaseBounds1D bx sx) (increaseBounds1D by sy)
 
 increaseBounds1D :: Bounds1D -> Size1D -> Bounds1D
 increaseBounds1D (lower, upper) size = (lower - size / 2, upper + size / 2)
+
+decreaseBounds2D :: Bounds2D -> Size2D -> Bounds2D
+decreaseBounds2D bounds size = increaseBounds2D bounds (-size)
+
+decreaseBounds1D :: Bounds1D -> Size1D -> Bounds1D
+decreaseBounds1D bounds size = increaseBounds1D bounds (-size)
