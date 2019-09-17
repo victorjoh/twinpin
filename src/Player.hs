@@ -8,7 +8,6 @@ module Player
     )
 where
 
-import           Time
 import           Space
 import           Shot
 import           Shape

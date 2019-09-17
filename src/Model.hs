@@ -1,6 +1,5 @@
 module Model where
 
-import           Time
 import           Player
 import           Shot
 import           Space

@@ -8,7 +8,6 @@ module Shot
     )
 where
 
-import           Time
 import           Space
 import           Shape
 import           Foreign.C.Types

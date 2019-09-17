@@ -2,7 +2,9 @@ module Space where
 
 import           SDL.Vect
 import           Foreign.C.Types
-import           Time
+
+type Time = Int
+type DeltaTime = Time
 
 type Position1D = Float
 type Velocity1D = Float
