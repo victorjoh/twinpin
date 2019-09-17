@@ -6,12 +6,15 @@ with a gamepad. So far I have only tried it with a Sony DualShock 4 V2. I
 develop this game to satisfy my functional programming itch.
 
 ## Build dependencies
-Stack is used to build the project. Stack will download most of the other build dependencies but there are some manual
-steps required to get SDL2 working.
+Stack is used to build the project. Stack will download most of the other build
+dependencies but there are some manual steps required to get SDL2 working.
 
 ### Windows specific setup
 To set up SDL2 for Windows, follow step 1-4 in [this Reddit
 post](https://www.reddit.com/r/haskellgamedev/comments/4jpthu/windows_sdl2_is_now_almost_painless_via_stack/).
+
+### Fedora specific setup
+TODO
 
 ## How to build and play
 `stack build` to build  
@@ -29,10 +32,14 @@ Server](https://marketplace.visualstudio.com/items?itemName=alanz.vscode-hie-ser
 It takes a few hours to build the complete Haskell IDE Engine.
 
 ### Windows specific setup
-Cabal is needed for Haskell IDE Engine to work properly. To install and update cabal, run
+Cabal is needed for Haskell IDE Engine to work properly. To install and update
+cabal, run
 ```
 stack install cabal-install
 cabal update
 ```
 as written in [this github issue for Haskell IDE
 Engine](https://github.com/haskell/haskell-ide-engine/issues/658).
+
+### Fedora specific setup
+TODO
