@@ -2,7 +2,7 @@ module Player
     ( Player
     , playerTextureFile
     , createPlayer
-    , drawPlayer
+    , toDrawablePlayer
     , updatePlayer
     , triggerShot
     )
@@ -16,8 +16,6 @@ import           Data.Word                      ( Word8
                                                 , Word32
                                                 )
 import           Foreign.C.Types
-import qualified Data.Map.Strict               as Map
-import           Data.Maybe                     ( fromJust )
 
 type Direction1D = Float
 -- Keep a 2D vector to cover the case when the aim stick is only moved in one
@@ -35,16 +33,12 @@ size = V2 side side
 playerTextureFile :: FilePath
 playerTextureFile = "gen/player.bmp"
 
-createPlayer :: Map.Map FilePath Texture -> Player
-createPlayer textureMap = Player
-    (Shape (size / 2)
-           (V2 0 0)
-           (fromJust (Map.lookup playerTextureFile textureMap))
-    )
-    (Aim2D 0 1 0)
+createPlayer :: Player
+createPlayer = Player (Shape (size / 2) (V2 0 0)) (Aim2D 0 1 0)
 
-drawPlayer :: Player -> (Texture, Maybe (Rectangle CInt), CDouble)
-drawPlayer (Player shape (Aim2D _ _ angle)) = drawShape shape angle size
+toDrawablePlayer :: Player -> (FilePath, Maybe (Rectangle CInt), CDouble)
+toDrawablePlayer (Player shape (Aim2D _ _ angle)) =
+    toDrawableShape shape angle size playerTextureFile
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle
@@ -53,8 +47,9 @@ createAngle x y oldAngle | isTooSmall x && isTooSmall y = oldAngle
     where isTooSmall direction = (abs direction) < 5000
 
 updatePlayer :: Player -> [Event] -> DeltaTime -> Bounds2D -> Player
-updatePlayer (Player (Shape position velocity texture) aim) events dt bounds =
-    Player (Shape newPosition newVelocity texture) newAim
+updatePlayer (Player (Shape position velocity) aim) events dt bounds = Player
+    (Shape newPosition newVelocity)
+    newAim
   where
     newVelocity = foldl updateVelocity velocity events
     newAim      = foldl updateAim aim events
@@ -63,9 +58,9 @@ updatePlayer (Player (Shape position velocity texture) aim) events dt bounds =
         (decreaseBounds2D bounds size)
 
 
-triggerShot :: Player -> [Event] -> Map.Map FilePath Texture -> Maybe Shot
-triggerShot (Player (Shape position _ _) (Aim2D _ _ angle)) events textureMap
-    | any isTriggerEvent events = Just $ createShot position angle textureMap
+triggerShot :: Player -> [Event] -> Maybe Shot
+triggerShot (Player (Shape position _) (Aim2D _ _ angle)) events
+    | any isTriggerEvent events = Just $ createShot position angle
     | otherwise                 = Nothing
 
 isTriggerEvent :: Event -> Bool

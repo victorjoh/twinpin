@@ -10,6 +10,7 @@ import           Foreign.C.Types
 import           Data.Word                      ( Word8 )
 import           Paths_twinpin
 import qualified Data.Map.Strict               as Map
+import           Data.Maybe                     ( fromJust )
 import           Control.Monad
 
 backgroundColor = V4 34 11 21
@@ -28,7 +29,7 @@ main = do
 
     textureMap <- foldM (appendTexture renderer) Map.empty getModelImages
     mapM_ (print . fst) (Map.toList textureMap)
-    gameLoop renderer $ createModel textureMap
+    gameLoop renderer createModel textureMap
 
 appendTexture
     :: Renderer
@@ -42,19 +43,28 @@ appendTexture renderer textureMap textureFile = do
     freeSurface surface
     return $ Map.insert textureFile texture textureMap
 
-gameLoop :: Renderer -> Model -> IO ()
-gameLoop renderer model = do
+gameLoop :: Renderer -> Model -> Map.Map FilePath Texture -> IO ()
+gameLoop renderer model textureMap = do
     threadDelay 20000
     events            <- pollEvents
     msSinceSdlLibInit <- ticks
     let newModel = updateModel model events msSinceSdlLibInit windowSize'
     rendererDrawColor renderer $= backgroundColor maxBound
     clear renderer
-    mapM_ (draw renderer) $ drawModel newModel
+    mapM_ (draw renderer textureMap) $ toDrawableModel newModel
     present renderer
-    unless (isFinished newModel) (gameLoop renderer newModel)
+    unless (isFinished newModel) (gameLoop renderer newModel textureMap)
 
-draw :: Renderer -> (Texture, Maybe (Rectangle CInt), CDouble) -> IO ()
-draw renderer (texture, destination, rotation) =
-    copyEx renderer texture Nothing destination rotation Nothing
+draw
+    :: Renderer
+    -> Map.Map FilePath Texture
+    -> (FilePath, Maybe (Rectangle CInt), CDouble)
+    -> IO ()
+draw renderer textureMap (textureFile, destination, rotation) =
+    copyEx renderer
+           (fromJust (Map.lookup textureFile textureMap))
+           Nothing
+           destination
+           rotation
+           Nothing
         $ V2 False False

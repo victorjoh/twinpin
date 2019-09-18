@@ -8,35 +8,31 @@ import           Data.Word                      ( Word8
                                                 , Word32
                                                 )
 import           Foreign.C.Types
-import qualified Data.Map.Strict               as Map
 import           Data.Maybe                     ( maybeToList )
 
-data Model = Model Time Player [Shot] (Map.Map FilePath Texture) Bool
+data Model = Model Time Player [Shot] Bool
 
 getModelImages :: [FilePath]
 getModelImages = [playerTextureFile, shotTextureFile]
 
-createModel :: Map.Map FilePath Texture -> Model
-createModel textureMap = Model 0 (createPlayer textureMap) [] textureMap False
+createModel :: Model
+createModel = Model 0 createPlayer [] False
 
-drawModel :: Model -> [(Texture, Maybe (Rectangle CInt), CDouble)]
-drawModel (Model _ player shots _ _) = drawPlayer player : map drawShot shots
+toDrawableModel :: Model -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
+toDrawableModel (Model _ player shots _) =
+    toDrawablePlayer player : map toDrawableShot shots
 
 updateModel :: Model -> [Event] -> Word32 -> V2 CInt -> Model
-updateModel (Model time player shots textureMap isFinished) events newWordTime (V2 bx by)
+updateModel (Model time player shots isFinished) events newWordTime (V2 bx by)
     = Model
         newTime
         newPlayer
         (filter
             (flip isShotWithinBounds bounds)
-            (map
-                (flip updateShot passedTime)
-                (  shots
-                ++ (maybeToList (triggerShot newPlayer events textureMap))
-                )
+            (map (flip updateShot passedTime)
+                 (shots ++ (maybeToList (triggerShot newPlayer events)))
             )
         )
-        textureMap
         (isFinished || any isClosedEvent events)
   where
     newTime    = fromIntegral newWordTime
@@ -49,4 +45,4 @@ isClosedEvent (Event _ (WindowClosedEvent _)) = True
 isClosedEvent _                               = False
 
 isFinished :: Model -> Bool
-isFinished (Model _ _ _ _ isFinished) = isFinished
+isFinished (Model _ _ _ isFinished) = isFinished

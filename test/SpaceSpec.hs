@@ -1,7 +1,4 @@
-module SpaceSpec
-    ( spec
-    )
-where
+module SpaceSpec where
 
 import           Test.Hspec
 import           Space

@@ -2,7 +2,7 @@ module Shot
     ( Shot
     , shotTextureFile
     , createShot
-    , drawShot
+    , toDrawableShot
     , updateShot
     , isShotWithinBounds
     )
@@ -12,12 +12,13 @@ import           Space
 import           Shape
 import           Foreign.C.Types
 import           SDL
-import qualified Data.Map.Strict               as Map
-import           Data.Maybe                     ( fromJust )
 
 newtype Shot = Shot Shape
 
 shotSpeed = 0.7
+
+shotTextureFile :: FilePath
+shotTextureFile = "gen/shot.bmp"
 
 side :: Size1D
 side = 32 / 3
@@ -25,22 +26,16 @@ side = 32 / 3
 size :: Size2D
 size = V2 side side
 
-shotTextureFile :: FilePath
-shotTextureFile = "gen/shot.bmp"
+createShot :: Position2D -> Angle2D -> Shot
+createShot position angle = Shot $ Shape position (toVelocity angle shotSpeed)
 
-createShot :: Position2D -> Angle2D -> Map.Map FilePath Texture -> Shot
-createShot position angle textureMap = Shot $ Shape
-    position
-    (toVelocity angle shotSpeed)
-    (fromJust (Map.lookup shotTextureFile textureMap))
-
-drawShot :: Shot -> (Texture, Maybe (Rectangle CInt), CDouble)
-drawShot (Shot shape) = drawShape shape 0 size
+toDrawableShot :: Shot -> (FilePath, Maybe (Rectangle CInt), CDouble)
+toDrawableShot (Shot shape) = toDrawableShape shape 0 size shotTextureFile
 
 updateShot :: Shot -> DeltaTime -> Shot
-updateShot (Shot (Shape position velocity texture)) dt =
-    Shot $ Shape (updatePosition2D position velocity dt) velocity texture
+updateShot (Shot (Shape position velocity)) dt =
+    Shot $ Shape (updatePosition2D position velocity dt) velocity
 
 isShotWithinBounds :: Shot -> Bounds2D -> Bool
-isShotWithinBounds (Shot (Shape position _ _)) bounds =
+isShotWithinBounds (Shot (Shape position _)) bounds =
     isWithinBounds2D position $ increaseBounds2D bounds size
