@@ -5,7 +5,7 @@ module Main where
 import           SDL
 import           SDL.Vect                       ( Point(..) )
 import           Control.Concurrent             ( threadDelay )
-import           Model
+import           Game
 import           Foreign.C.Types
 import           Data.Word                      ( Word8 )
 import           Paths_twinpin
@@ -27,9 +27,9 @@ main = do
     joysticks <- availableJoysticks
     mapM_ openJoystick joysticks
 
-    textureMap <- foldM (appendTexture renderer) Map.empty getModelImages
+    textureMap <- foldM (appendTexture renderer) Map.empty gameTextureFiles
     mapM_ (print . fst) (Map.toList textureMap)
-    gameLoop renderer createModel textureMap
+    gameLoop renderer createGame textureMap
 
 appendTexture
     :: Renderer
@@ -43,17 +43,17 @@ appendTexture renderer textureMap textureFile = do
     freeSurface surface
     return $ Map.insert textureFile texture textureMap
 
-gameLoop :: Renderer -> Model -> Map.Map FilePath Texture -> IO ()
-gameLoop renderer model textureMap = do
+gameLoop :: Renderer -> Game -> Map.Map FilePath Texture -> IO ()
+gameLoop renderer game textureMap = do
     threadDelay 20000
     events            <- pollEvents
     msSinceSdlLibInit <- ticks
-    let newModel = updateModel model events msSinceSdlLibInit windowSize'
+    let newGame = updateGame game events msSinceSdlLibInit windowSize'
     rendererDrawColor renderer $= backgroundColor maxBound
     clear renderer
-    mapM_ (draw renderer textureMap) $ toDrawableModel newModel
+    mapM_ (draw renderer textureMap) $ toDrawableGame newGame
     present renderer
-    unless (isFinished newModel) (gameLoop renderer newModel textureMap)
+    unless (isFinished newGame) (gameLoop renderer newGame textureMap)
 
 draw
     :: Renderer

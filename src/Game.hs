@@ -1,4 +1,4 @@
-module Model where
+module Game where
 
 import           Player
 import           Shot
@@ -10,21 +10,21 @@ import           Data.Word                      ( Word8
 import           Foreign.C.Types
 import           Data.Maybe                     ( maybeToList )
 
-data Model = Model Time Player [Shot] Bool
+data Game = Game Time Player [Shot] Bool
 
-getModelImages :: [FilePath]
-getModelImages = [playerTextureFile, shotTextureFile]
+gameTextureFiles :: [FilePath]
+gameTextureFiles = [playerTextureFile, shotTextureFile]
 
-createModel :: Model
-createModel = Model 0 createPlayer [] False
+createGame :: Game
+createGame = Game 0 createPlayer [] False
 
-toDrawableModel :: Model -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
-toDrawableModel (Model _ player shots _) =
+toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
+toDrawableGame (Game _ player shots _) =
     toDrawablePlayer player : map toDrawableShot shots
 
-updateModel :: Model -> [Event] -> Word32 -> V2 CInt -> Model
-updateModel (Model time player shots isFinished) events newWordTime (V2 bx by)
-    = Model
+updateGame :: Game -> [Event] -> Word32 -> V2 CInt -> Game
+updateGame (Game time player shots isFinished) events newWordTime (V2 bx by)
+    = Game
         newTime
         newPlayer
         (filter
@@ -44,5 +44,5 @@ isClosedEvent :: Event -> Bool
 isClosedEvent (Event _ (WindowClosedEvent _)) = True
 isClosedEvent _                               = False
 
-isFinished :: Model -> Bool
-isFinished (Model _ _ _ isFinished) = isFinished
+isFinished :: Game -> Bool
+isFinished (Game _ _ _ isFinished) = isFinished
