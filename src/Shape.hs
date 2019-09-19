@@ -4,7 +4,7 @@ import           Space
 import           Foreign.C.Types
 import           SDL.Video.Renderer             ( Rectangle(..) )
 
-data Shape = Shape Position2D Velocity2D
+data Shape = Shape Position2D Velocity2D deriving (Show, Eq)
 
 -- Converts to something that is easily drawable by SDL. Shape has coordinates 
 -- on the middle of the texture, whereas the SDL representation has the

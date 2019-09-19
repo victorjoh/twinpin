@@ -1,5 +1,6 @@
 module Shot
     ( Shot
+    , shotSpeed
     , shotTextureFile
     , createShot
     , toDrawableShot
@@ -13,8 +14,9 @@ import           Shape
 import           Foreign.C.Types
 import           SDL
 
-newtype Shot = Shot Shape
+newtype Shot = Shot Shape deriving (Show, Eq)
 
+shotSpeed :: Speed
 shotSpeed = 0.7
 
 shotTextureFile :: FilePath
