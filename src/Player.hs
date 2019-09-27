@@ -1,5 +1,6 @@
 module Player
     ( Player
+    , playerSize
     , playerTextureFile
     , createPlayer
     , toDrawablePlayer
@@ -21,30 +22,40 @@ type Direction1D = Float
 -- Keep a 2D vector to cover the case when the aim stick is only moved in one
 -- axis. Keep the rotation to cover the case when the aim stick is moved to the
 -- default position (0, 0).
-data Aim2D = Aim2D Direction1D Direction1D Angle2D
-data Player = Player Shape Aim2D
+data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
+data Player = Player Shape Aim2D deriving (Show, Eq)
 
 side :: Size1D
 side = 32
 
-size :: Size2D
-size = V2 side side
+axisPositionToVelocity = 0.00001
+minAxisPosition = 5000
+
+playerSize :: Size2D
+playerSize = V2 side side
 
 playerTextureFile :: FilePath
 playerTextureFile = "gen/player.bmp"
 
-createPlayer :: Player
-createPlayer = Player (Shape (size / 2) (V2 0 0)) (Aim2D 0 1 0)
+createPlayer :: Position2D -> Angle2D -> Player
+createPlayer pos angle = Player (Shape pos (V2 0 0)) (Aim2D 0 0 angle)
 
 toDrawablePlayer :: Player -> (FilePath, Maybe (Rectangle CInt), CDouble)
 toDrawablePlayer (Player shape (Aim2D _ _ angle)) =
-    toDrawableShape shape angle size playerTextureFile
+    toDrawableShape shape angle playerSize playerTextureFile
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle
-createAngle x y oldAngle | isTooSmall x && isTooSmall y = oldAngle
+createAngle x y oldAngle | isCloseToDefault x && isCloseToDefault y = oldAngle
                          | otherwise = (atan2 y x) * (180 / pi)
-    where isTooSmall direction = (abs direction) < 5000
+    where isCloseToDefault direction = abs direction < minAxisPosition
+
+createVelocity :: Direction1D -> Direction1D -> Velocity2D
+createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
+                   | otherwise = V2 x y
+  where
+    isCloseToDefault direction =
+        abs direction < minAxisPosition * axisPositionToVelocity
 
 updatePlayer :: Player -> [Event] -> DeltaTime -> Bounds2D -> Player
 updatePlayer (Player (Shape position velocity) aim) events dt bounds = Player
@@ -55,7 +66,7 @@ updatePlayer (Player (Shape position velocity) aim) events dt bounds = Player
     newAim      = foldl updateAim aim events
     newPosition = limitPosition2D
         (updatePosition2D position newVelocity dt)
-        (decreaseBounds2D bounds size)
+        (decreaseBounds2D bounds playerSize)
 
 
 triggerShot :: Player -> [Event] -> Maybe Shot
@@ -79,9 +90,9 @@ updateAim aim _ = aim
 
 updateVelocity :: Velocity2D -> Event -> Velocity2D
 updateVelocity (V2 x y) (Event _ (JoyAxisEvent (JoyAxisEventData _ axis position)))
-    = let pos = (0.00001 * fromIntegral position)
+    = let newV = axisPositionToVelocity * fromIntegral position
       in  case axis of
-              0 -> V2 pos y
-              1 -> V2 x pos
+              0 -> createVelocity newV y
+              1 -> createVelocity x newV
               _ -> V2 x y
 updateVelocity velocity _ = velocity

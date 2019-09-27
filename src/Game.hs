@@ -16,7 +16,7 @@ gameTextureFiles :: [FilePath]
 gameTextureFiles = [playerTextureFile, shotTextureFile]
 
 createGame :: Game
-createGame = Game 0 createPlayer [] False
+createGame = Game 0 (createPlayer (playerSize / 2) 0) [] False
 
 toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
 toDrawableGame (Game _ player shots _) =
