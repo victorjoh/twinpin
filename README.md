@@ -26,7 +26,7 @@ To develop twinpin, I use Visual Studio Code with the following extensions:
 * Haskell Language Server (alanz.vscode-hie-server)
 * Rewrap (stkb.rewrap)
 
-Haskell Language Server has requirement on Haskell IDE Engine. Instruction for
+Haskell Language Server has a requirement on Haskell IDE Engine. Instruction for
 how to install it is found in the [README for Haskell Language
 Server](https://marketplace.visualstudio.com/items?itemName=alanz.vscode-hie-server).
 It takes a few hours to build the complete Haskell IDE Engine.
