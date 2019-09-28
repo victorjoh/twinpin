@@ -23,8 +23,8 @@ toDrawableGame (Game _ player shots _) =
     toDrawablePlayer player : map toDrawableShot shots
 
 updateGame :: Game -> [Event] -> Word32 -> V2 CInt -> Game
-updateGame (Game time player shots isFinished) events newWordTime (V2 bx by)
-    = Game
+updateGame (Game time player shots isFinished) events newWordTime (V2 bx by) =
+    Game
         newTime
         newPlayer
         (filter
