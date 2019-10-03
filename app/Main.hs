@@ -29,7 +29,7 @@ main = do
 
     textureMap <- foldM (appendTexture renderer) Map.empty gameTextureFiles
     mapM_ (print . fst) (Map.toList textureMap)
-    gameLoop renderer createGame textureMap
+    gameLoop renderer (createGame windowSize') textureMap
 
 appendTexture
     :: Renderer

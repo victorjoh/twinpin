@@ -1,5 +1,6 @@
 module Player
     ( Player
+    , playerSide
     , playerSize
     , playerTextureFile
     , createPlayer
@@ -25,14 +26,14 @@ type Direction1D = Float
 data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
 data Player = Player Shape Aim2D deriving (Show, Eq)
 
-side :: Size1D
-side = 32
+playerSide :: Size1D
+playerSide = 32
 
 axisPositionToVelocity = 0.00001
 minAxisPosition = 5000
 
 playerSize :: Size2D
-playerSize = V2 side side
+playerSize = V2 playerSide playerSide
 
 playerTextureFile :: FilePath
 playerTextureFile = "gen/player.bmp"

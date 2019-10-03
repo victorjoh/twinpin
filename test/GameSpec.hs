@@ -23,9 +23,9 @@ spec = do
     describe "toDrawableGame" $ do
         it "converts from game to something that can be drawn by SDL"
             $          do
-                           toDrawableGame createGame
+                           toDrawableGame (createGame (V2 100 70))
             `shouldBe` [ ( "gen/player.bmp"
-                         , Just (Rectangle (P (V2 0 0)) (V2 32 32))
+                         , Just (Rectangle (P (V2 32 19)) (V2 32 32))
                          , 0
                          )
                        ]
@@ -34,7 +34,7 @@ spec = do
         it "updates the player given the right event" $ do
             toDrawableGame
                     (updateGame
-                        createGame
+                        (createGame (V2 200 100))
                         [ Event 0 (JoyAxisEvent (JoyAxisEventData 0 0 10000))
                         , Event 0 (JoyAxisEvent (JoyAxisEventData 0 1 20000))
                         ]
@@ -42,14 +42,14 @@ spec = do
                         (V2 200 100)
                     )
                 `shouldBe` [ ( "gen/player.bmp"
-                             , Just (Rectangle (P (V2 5 10)) (V2 32 32))
+                             , Just (Rectangle (P (V2 37 44)) (V2 32 32))
                              , 0
                              )
                            ]
         it "creates a shot given the right event" $ do
             toDrawableGame
                     (updateGame
-                        createGame
+                        (createGame (V2 80 80))
                         [ Event
                               0
                               (JoyButtonEvent
@@ -57,10 +57,10 @@ spec = do
                               )
                         ]
                         50
-                        (V2 50 50)
+                        (V2 80 80)
                     )
                 `shouldContain` [ ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 46 11)) (V2 11 11))
+                                  , Just (Rectangle (P (V2 78 35)) (V2 11 11))
                                   , 0
                                   )
                                 ]
@@ -68,7 +68,7 @@ spec = do
             toDrawableGame
                     (updateGame
                         (updateGame
-                            createGame
+                            (createGame (V2 70 70))
                             [ Event
                                   0
                                   (JoyButtonEvent
@@ -76,14 +76,14 @@ spec = do
                                   )
                             ]
                             25
-                            (V2 45 45)
+                            (V2 70 70)
                         )
                         []
                         50
-                        (V2 45 45)
+                        (V2 70 70)
                     )
                 `shouldBe` [ ( "gen/player.bmp"
-                             , Just (Rectangle (P (V2 0 0)) (V2 32 32))
+                             , Just (Rectangle (P (V2 32 19)) (V2 32 32))
                              , 0
                              )
                            ]
@@ -91,7 +91,7 @@ spec = do
             toDrawableGame
                     (updateGame
                         (updateGame
-                            createGame
+                            (createGame (V2 100 100))
                             [ Event
                                   0
                                   (JoyButtonEvent
@@ -99,7 +99,7 @@ spec = do
                                   )
                             ]
                             25
-                            (V2 45 45)
+                            (V2 100 100)
                         )
                         [ Event 0 (JoyAxisEvent (JoyAxisEventData 0 4 10000))
                         , Event
@@ -109,22 +109,25 @@ spec = do
                             )
                         ]
                         50
-                        (V2 50 50)
+                        (V2 100 100)
                     )
                 `shouldContain` [ ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 46 11)) (V2 11 11))
+                                  , Just (Rectangle (P (V2 78 45)) (V2 11 11))
                                   , 0
                                   )
                                 , ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 11 28)) (V2 11 11))
+                                  , Just (Rectangle (P (V2 43 62)) (V2 11 11))
                                   , 0
                                   )
                                 ]
         it "is not finished when the user has not closed the window" $ do
-            not $ isFinished $ updateGame createGame [] 50 (V2 50 50)
+            not $ isFinished $ updateGame (createGame (V2 50 50))
+                                          []
+                                          50
+                                          (V2 50 50)
         it "is finished when the user closes the window" $ do
             isFinished $ updateGame
-                createGame
+                (createGame (V2 50 50))
                 [ Event
                       0
                       (WindowClosedEvent

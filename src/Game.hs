@@ -15,8 +15,12 @@ data Game = Game Time Player [Shot] Bool
 gameTextureFiles :: [FilePath]
 gameTextureFiles = [playerTextureFile, shotTextureFile]
 
-createGame :: Game
-createGame = Game 0 (createPlayer (playerSize / 2) 0) [] False
+createGame :: V2 CInt -> Game
+createGame (V2 bx by) = Game
+    0
+    (createPlayer (V2 (playerSide + playerSide / 2) (fromIntegral by / 2)) 0)
+    []
+    False
 
 toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
 toDrawableGame (Game _ player shots _) =
