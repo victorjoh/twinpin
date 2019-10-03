@@ -39,6 +39,7 @@ library:
   dependencies:
   - sdl2
   - containers
+  - extra
 
 executables:
   twinpin-exe:

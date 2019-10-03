@@ -18,7 +18,7 @@ gameTextureFiles = [playerTextureFile, shotTextureFile]
 createGame :: V2 CInt -> Game
 createGame (V2 bx by) = Game
     0
-    (createPlayer (V2 (playerSide + playerSide / 2) (fromIntegral by / 2)) 0)
+    (createPlayer (V2 (playerSide + playerSide / 2) (fromIntegral by / 2)) 0 0)
     []
     False
 
