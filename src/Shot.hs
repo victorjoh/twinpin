@@ -34,8 +34,8 @@ createShot position angle = Shot $ Shape position (toVelocity angle shotSpeed)
 toDrawableShot :: Shot -> (FilePath, Maybe (Rectangle CInt), CDouble)
 toDrawableShot (Shot shape) = toDrawableShape shape 0 size shotTextureFile
 
-updateShot :: Shot -> DeltaTime -> Shot
-updateShot (Shot (Shape position velocity)) dt =
+updateShot :: DeltaTime -> Shot -> Shot
+updateShot dt (Shot (Shape position velocity)) =
     Shot $ Shape (updatePosition2D position velocity dt) velocity
 
 isShotWithinBounds :: Shot -> Bounds2D -> Bool

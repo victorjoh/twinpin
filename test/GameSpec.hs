@@ -12,6 +12,7 @@ import           SDL.Internal.Types             ( Window(..) )
 import           Foreign.Ptr                    ( nullPtr )
 import           Foreign.C.Types
 import           SDL.Video.Renderer             ( Rectangle(..) )
+import           Data.Tuple.Extra               ( fst3 )
 
 spec :: Spec
 spec = do
@@ -22,13 +23,17 @@ spec = do
 
     describe "toDrawableGame" $ do
         it "converts from game to something that can be drawn by SDL"
-            $          do
-                           toDrawableGame (createGame (V2 100 70))
-            `shouldBe` [ ( "gen/player.bmp"
-                         , Just (Rectangle (P (V2 32 19)) (V2 32 32))
-                         , 0
-                         )
-                       ]
+            $               do
+                                toDrawableGame (createGame (V2 200 70))
+            `shouldContain` [ ( "gen/player.bmp"
+                              , Just (Rectangle (P (V2 32 19)) (V2 32 32))
+                              , 0
+                              )
+                            , ( "gen/player.bmp"
+                              , Just (Rectangle (P (V2 136 19)) (V2 32 32))
+                              , 180
+                              )
+                            ]
 
     describe "updateGame" $ do
         it "updates the player given the right event" $ do
@@ -41,11 +46,11 @@ spec = do
                         50
                         (V2 200 100)
                     )
-                `shouldBe` [ ( "gen/player.bmp"
-                             , Just (Rectangle (P (V2 37 44)) (V2 32 32))
-                             , 0
-                             )
-                           ]
+                `shouldContain` [ ( "gen/player.bmp"
+                                  , Just (Rectangle (P (V2 37 44)) (V2 32 32))
+                                  , 0
+                                  )
+                                ]
         it "creates a shot given the right event" $ do
             toDrawableGame
                     (updateGame
@@ -82,11 +87,7 @@ spec = do
                         50
                         (V2 70 70)
                     )
-                `shouldBe` [ ( "gen/player.bmp"
-                             , Just (Rectangle (P (V2 32 19)) (V2 32 32))
-                             , 0
-                             )
-                           ]
+                `shouldNotSatisfy` any ((== "gen/shot.bmp") . fst3)
         it "can handle multiple shots at the same time" $ do
             toDrawableGame
                     (updateGame

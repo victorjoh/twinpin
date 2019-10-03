@@ -21,9 +21,8 @@ spec = do
 
     describe "updateShot" $ do
         it "updates the shot position from passed time and its velocity" $ do
-            updateShot (createShot (V2 6 2) 30) 10 `shouldBe` createShot
-                (V2 (6 + 10 * shotSpeed * sqrt (3) / 2)
-                    (2 + 10 * shotSpeed / 2)
+            updateShot 10 (createShot (V2 6 2) 30) `shouldBe` createShot
+                (V2 (6 + 10 * shotSpeed * sqrt (3) / 2) (2 + 10 * shotSpeed / 2)
                 )
                 30
 

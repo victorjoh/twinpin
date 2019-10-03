@@ -68,8 +68,8 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
     isCloseToDefault direction =
         abs direction < minAxisPosition * axisPositionToVelocity
 
-updatePlayer :: Player -> [Event] -> DeltaTime -> Bounds2D -> Player
-updatePlayer (Player (Shape position velocity) aim joystickId) events dt bounds
+updatePlayer :: [Event] -> DeltaTime -> Bounds2D -> Player -> Player
+updatePlayer events dt bounds (Player (Shape position velocity) aim joystickId)
     = Player (Shape newPosition newVelocity) newAim joystickId
   where
     axisEvents =
@@ -102,8 +102,8 @@ updateVelocity (V2 x y) (axisId, axisPosition) =
             1 -> createVelocity x newV
             _ -> V2 x y
 
-triggerShot :: Player -> [Event] -> Maybe Shot
-triggerShot (Player (Shape position _) (Aim2D _ _ angle) joystickId) events
+triggerShot :: [Event] -> Player -> Maybe Shot
+triggerShot events (Player (Shape position _) (Aim2D _ _ angle) joystickId) 
     | any (== (rightBumberButtonId, JoyButtonPressed))
         $ map (joyButtonEventButton &&& joyButtonEventState)
         $ filter ((joystickId ==) . joyButtonEventWhich)

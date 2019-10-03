@@ -8,9 +8,9 @@ import           Data.Word                      ( Word8
                                                 , Word32
                                                 )
 import           Foreign.C.Types
-import           Data.Maybe                     ( maybeToList )
+import           Data.Maybe                     ( mapMaybe )
 
-data Game = Game Time Player [Shot] Bool
+data Game = Game Time [Player] [Shot] Bool
 
 gameTextureFiles :: [FilePath]
 gameTextureFiles = [playerTextureFile, shotTextureFile]
@@ -18,23 +18,28 @@ gameTextureFiles = [playerTextureFile, shotTextureFile]
 createGame :: V2 CInt -> Game
 createGame (V2 bx by) = Game
     0
-    (createPlayer (V2 (playerSide + playerSide / 2) (fromIntegral by / 2)) 0 0)
+    [ (createPlayer (V2 xDistanceFromEdge yMiddle) 0 0)
+    , (createPlayer (V2 (fromIntegral bx - xDistanceFromEdge) yMiddle) 180 1)
+    ]
     []
     False
+  where
+    yMiddle           = (fromIntegral by / 2)
+    xDistanceFromEdge = playerSide + playerSide / 2
 
 toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
-toDrawableGame (Game _ player shots _) =
-    toDrawablePlayer player : map toDrawableShot shots
+toDrawableGame (Game _ players shots _) =
+    map toDrawablePlayer players ++ map toDrawableShot shots
 
 updateGame :: Game -> [Event] -> Word32 -> V2 CInt -> Game
-updateGame (Game time player shots isFinished) events newWordTime (V2 bx by) =
+updateGame (Game time players shots isFinished) events newWordTime (V2 bx by) =
     Game
         newTime
-        newPlayer
+        newPlayers
         (filter
             (flip isShotWithinBounds bounds)
-            (map (flip updateShot passedTime)
-                 (shots ++ (maybeToList (triggerShot newPlayer events)))
+            (map (updateShot passedTime)
+                 (shots ++ (mapMaybe (triggerShot events) newPlayers))
             )
         )
         (isFinished || any isClosedEvent events)
@@ -42,7 +47,7 @@ updateGame (Game time player shots isFinished) events newWordTime (V2 bx by) =
     newTime    = fromIntegral newWordTime
     passedTime = newTime - time
     bounds     = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
-    newPlayer  = updatePlayer player events passedTime bounds
+    newPlayers = (map (updatePlayer events passedTime bounds) players)
 
 isClosedEvent :: Event -> Bool
 isClosedEvent (Event _ (WindowClosedEvent _)) = True
