@@ -28,15 +28,15 @@ spec = do
 
     describe "isShotWithinBounds" $ do
         it "returns true if the shot is within the borders" $ do
-            isShotWithinBounds (createShot (V2 50 150) 0)
-                               (Bounds2D (0, 100) (100, 200))
+            isShotWithinBounds (Bounds2D (0, 100) (100, 200))
+                               (createShot (V2 50 150) 0)
                 `shouldBe` True
         it "returns true if the shot is on the border" $ do
-            isShotWithinBounds (createShot (V2 50 204) 0)
-                               (Bounds2D (0, 100) (100, 200))
+            isShotWithinBounds (Bounds2D (0, 100) (100, 200))
+                               (createShot (V2 50 204) 0)
                 `shouldBe` True
         it "returns false if the shot is outside the border" $ do
-            isShotWithinBounds (createShot (V2 50 208) 0)
-                               (Bounds2D (0, 100) (100, 200))
+            isShotWithinBounds (Bounds2D (0, 100) (100, 200))
+                               (createShot (V2 50 208) 0)
                 `shouldBe` False
 

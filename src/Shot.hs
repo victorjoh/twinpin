@@ -38,6 +38,6 @@ updateShot :: DeltaTime -> Shot -> Shot
 updateShot dt (Shot (Shape position velocity)) =
     Shot $ Shape (updatePosition2D position velocity dt) velocity
 
-isShotWithinBounds :: Shot -> Bounds2D -> Bool
-isShotWithinBounds (Shot (Shape position _)) bounds =
+isShotWithinBounds :: Bounds2D -> Shot -> Bool
+isShotWithinBounds bounds (Shot (Shape position _)) =
     isWithinBounds2D position $ increaseBounds2D bounds size

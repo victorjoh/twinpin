@@ -31,13 +31,13 @@ toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
 toDrawableGame (Game _ players shots _) =
     map toDrawablePlayer players ++ map toDrawableShot shots
 
-updateGame :: Game -> [Event] -> Word32 -> V2 CInt -> Game
-updateGame (Game time players shots isFinished) events newWordTime (V2 bx by) =
+updateGame :: [Event] -> Word32 -> V2 CInt -> Game -> Game
+updateGame events newWordTime (V2 bx by) (Game time players shots isFinished) =
     Game
         newTime
         newPlayers
         (filter
-            (flip isShotWithinBounds bounds)
+            (isShotWithinBounds bounds)
             (map (updateShot passedTime)
                  (shots ++ (mapMaybe (triggerShot events) newPlayers))
             )

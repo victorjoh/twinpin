@@ -39,12 +39,12 @@ spec = do
         it "updates the player given the right event" $ do
             toDrawableGame
                     (updateGame
-                        (createGame (V2 200 100))
                         [ Event 0 (JoyAxisEvent (JoyAxisEventData 0 0 10000))
                         , Event 0 (JoyAxisEvent (JoyAxisEventData 0 1 20000))
                         ]
                         50
                         (V2 200 100)
+                        (createGame (V2 200 100))
                     )
                 `shouldContain` [ ( "gen/player.bmp"
                                   , Just (Rectangle (P (V2 37 44)) (V2 32 32))
@@ -54,7 +54,6 @@ spec = do
         it "creates a shot given the right event" $ do
             toDrawableGame
                     (updateGame
-                        (createGame (V2 80 80))
                         [ Event
                               0
                               (JoyButtonEvent
@@ -63,6 +62,7 @@ spec = do
                         ]
                         50
                         (V2 80 80)
+                        (createGame (V2 80 80))
                     )
                 `shouldContain` [ ( "gen/shot.bmp"
                                   , Just (Rectangle (P (V2 78 35)) (V2 11 11))
@@ -72,8 +72,10 @@ spec = do
         it "removes a shot if it is out of bounds" $ do
             toDrawableGame
                     (updateGame
+                        []
+                        50
+                        (V2 70 70)
                         (updateGame
-                            (createGame (V2 70 70))
                             [ Event
                                   0
                                   (JoyButtonEvent
@@ -82,26 +84,13 @@ spec = do
                             ]
                             25
                             (V2 70 70)
+                            (createGame (V2 70 70))
                         )
-                        []
-                        50
-                        (V2 70 70)
                     )
                 `shouldNotSatisfy` any ((== "gen/shot.bmp") . fst3)
         it "can handle multiple shots at the same time" $ do
             toDrawableGame
                     (updateGame
-                        (updateGame
-                            (createGame (V2 100 100))
-                            [ Event
-                                  0
-                                  (JoyButtonEvent
-                                      (JoyButtonEventData 0 5 JoyButtonPressed)
-                                  )
-                            ]
-                            25
-                            (V2 100 100)
-                        )
                         [ Event 0 (JoyAxisEvent (JoyAxisEventData 0 4 10000))
                         , Event
                             0
@@ -111,6 +100,17 @@ spec = do
                         ]
                         50
                         (V2 100 100)
+                        (updateGame
+                            [ Event
+                                  0
+                                  (JoyButtonEvent
+                                      (JoyButtonEventData 0 5 JoyButtonPressed)
+                                  )
+                            ]
+                            25
+                            (V2 100 100)
+                            (createGame (V2 100 100))
+                        )
                     )
                 `shouldContain` [ ( "gen/shot.bmp"
                                   , Just (Rectangle (P (V2 78 45)) (V2 11 11))
@@ -122,13 +122,12 @@ spec = do
                                   )
                                 ]
         it "is not finished when the user has not closed the window" $ do
-            not $ isFinished $ updateGame (createGame (V2 50 50))
-                                          []
+            not $ isFinished $ updateGame []
                                           50
                                           (V2 50 50)
+                                          (createGame (V2 50 50))
         it "is finished when the user closes the window" $ do
             isFinished $ updateGame
-                (createGame (V2 50 50))
                 [ Event
                       0
                       (WindowClosedEvent
@@ -137,3 +136,4 @@ spec = do
                 ]
                 50
                 (V2 50 50)
+                (createGame (V2 50 50))
