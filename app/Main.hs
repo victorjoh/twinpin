@@ -23,12 +23,9 @@ main = do
                            defaultWindow { windowInitialSize = windowSize' }
     renderer <- createRenderer window (-1) defaultRenderer
     showWindow window
-
     joysticks <- availableJoysticks
     mapM_ openJoystick joysticks
-
     textureMap <- foldM (appendTexture renderer) Map.empty gameTextureFiles
-    mapM_ (print . fst) (Map.toList textureMap)
     gameLoop renderer (createGame windowSize') textureMap
 
 appendTexture
