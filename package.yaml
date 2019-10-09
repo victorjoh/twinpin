@@ -40,6 +40,7 @@ library:
   - sdl2
   - containers
   - extra
+  - TypeCompose
 
 executables:
   twinpin-exe:

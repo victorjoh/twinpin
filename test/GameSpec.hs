@@ -19,7 +19,10 @@ spec = do
     describe "gameTextureFiles" $ do
         it "retreives all the paths to texture files in the game" $ do
             gameTextureFiles
-                `shouldMatchList` ["gen/shot.bmp", "gen/player.bmp"]
+                `shouldMatchList` [ "gen/shot.bmp"
+                                  , "gen/shot-hit.bmp"
+                                  , "gen/player.bmp"
+                                  ]
 
     describe "toDrawableGame" $ do
         it "converts from game to something that can be drawn by SDL"
@@ -99,7 +102,7 @@ spec = do
                             )
                         ]
                         50
-                        (V2 100 100)
+                        (V2 200 100)
                         (updateGame
                             [ Event
                                   0
@@ -108,8 +111,8 @@ spec = do
                                   )
                             ]
                             25
-                            (V2 100 100)
-                            (createGame (V2 100 100))
+                            (V2 200 100)
+                            (createGame (V2 200 100))
                         )
                     )
                 `shouldContain` [ ( "gen/shot.bmp"
@@ -121,6 +124,47 @@ spec = do
                                   , 0
                                   )
                                 ]
+        it "changes color for shots that pass through target players" $ do
+            toDrawableGame
+                    (updateGame
+                        [ Event
+                              0
+                              (JoyButtonEvent
+                                  (JoyButtonEventData 0 5 JoyButtonPressed)
+                              )
+                        ]
+                        100
+                        (V2 177 600)
+                        (createGame (V2 177 600))
+                    )
+                `shouldContain` [ ( "gen/shot-hit.bmp"
+                                  , Just (Rectangle (P (V2 113 295)) (V2 11 11))
+                                  , 0.0
+                                  )
+                                ]
+        it
+                ("changes color for shots that pass through target players even"
+                ++ " though they haven't left the barrel of the player"
+                ++ " triggering the shot"
+                )
+            $               do
+                                toDrawableGame
+                                    (updateGame
+                                        [ Event
+                                              0
+                                              (JoyButtonEvent
+                                                  (JoyButtonEventData 0 5 JoyButtonPressed)
+                                              )
+                                        ]
+                                        23
+                                        (V2 128 600)
+                                        (createGame (V2 128 600))
+                                    )
+            `shouldContain` [ ( "gen/shot-hit.bmp"
+                              , Just (Rectangle (P (V2 59 295)) (V2 11 11))
+                              , 0.0
+                              )
+                            ]
         it "is not finished when the user has not closed the window" $ do
             not $ isFinished $ updateGame []
                                           50

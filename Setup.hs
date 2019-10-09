@@ -19,7 +19,8 @@ loadRender svgPath bmpPath bmpSize = do
 main :: IO ()
 main = do
     createDirectoryIfMissing False "gen"
-    loadRender "images/player.svg" "gen/player.bmp" (128, 128)
-    loadRender "images/shot.svg"   "gen/shot.bmp"   (11 , 11)
+    loadRender "images/player.svg"   "gen/player.bmp"   (128, 128)
+    loadRender "images/shot.svg"     "gen/shot.bmp"     (11 , 11)
+    loadRender "images/shot-hit.svg" "gen/shot-hit.bmp" (11 , 11)
     defaultMain
 

@@ -8,50 +8,137 @@ import           Data.Word                      ( Word8
                                                 , Word32
                                                 )
 import           Foreign.C.Types
-import           Data.Maybe                     ( mapMaybe )
+import           Data.Maybe                     ( mapMaybe
+                                                , maybeToList
+                                                )
+import           Data.Zip                       ( fsts )
+import           Data.List                      ( delete
+                                                , partition
+                                                )
+import           Circle                         ( areIntersecting )
 
-data Game = Game Time [Player] [Shot] Bool
+data Game = Game Time ([Shot], [(Player, Barrel)]) Bool
+
+-- Shots that still haven't left the players barrel after firing. These are
+-- separated from other shots to make sure that the player isn't immediately hit
+-- by his own shot after firing.
+type Barrel = [Shot]
 
 gameTextureFiles :: [FilePath]
-gameTextureFiles = [playerTextureFile, shotTextureFile]
+gameTextureFiles = playerTextureFile : shotTextureFiles
 
 createGame :: V2 CInt -> Game
 createGame (V2 bx by) = Game
     0
-    [ (createPlayer (V2 xDistanceFromEdge yMiddle) 0 0)
-    , (createPlayer (V2 (fromIntegral bx - xDistanceFromEdge) yMiddle) 180 1)
-    ]
-    []
+    ( []
+    , [ ((createPlayer (V2 xDistanceFromEdge yMiddle) 0 0), [])
+      , ( (createPlayer (V2 (fromIntegral bx - xDistanceFromEdge) yMiddle) 180 1
+          )
+        , []
+        )
+      ]
+    )
     False
   where
     yMiddle           = (fromIntegral by / 2)
     xDistanceFromEdge = playerSide + playerSide / 2
 
 toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
-toDrawableGame (Game _ players shots _) =
-    map toDrawablePlayer players ++ map toDrawableShot shots
+toDrawableGame (Game _ (shots, playersWithBarrels) _) =
+    map (toDrawablePlayer . fst) playersWithBarrels
+        ++ map toDrawableShot (allShots playersWithBarrels shots)
+
+allShots :: [(Player, Barrel)] -> [Shot] -> [Shot]
+allShots playersWithBarrels shots =
+    shots ++ concat (map snd playersWithBarrels)
 
 updateGame :: [Event] -> Word32 -> V2 CInt -> Game -> Game
-updateGame events newWordTime (V2 bx by) (Game time players shots isFinished) =
+updateGame events newWordTime (V2 bx by) (Game time movingObjects isFinished) =
     Game
         newTime
-        newPlayers
-        (filter
-            (isShotWithinBounds bounds)
-            (map (updateShot passedTime)
-                 (shots ++ (mapMaybe (triggerShot events) newPlayers))
-            )
+        ( filterOutOfBounds bounds
+        $ exitBarrels
+        $ registerHits
+        $ updateShots passedTime
+        $ triggerShots events
+        $ updatePlayers events passedTime bounds movingObjects
         )
         (isFinished || any isClosedEvent events)
   where
     newTime    = fromIntegral newWordTime
     passedTime = newTime - time
     bounds     = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
-    newPlayers = (map (updatePlayer events passedTime bounds) players)
+
+filterOutOfBounds
+    :: Bounds2D -> ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
+filterOutOfBounds bounds (shots, playersWithBarrels) =
+    (filter (isShotWithinBounds bounds) shots, playersWithBarrels)
+
+exitBarrels :: ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
+exitBarrels (shots, playersWithBarrels) =
+    foldl exitBarrel (shots, []) playersWithBarrels
+
+exitBarrel
+    :: ([Shot], [(Player, Barrel)])
+    -> (Player, Barrel)
+    -> ([Shot], [(Player, Barrel)])
+exitBarrel (shots, playersWithBarrels) (player, barrel) =
+    (shots ++ outsideBarrel, (player, insideBarrel) : playersWithBarrels)
+  where
+    (outsideBarrel, insideBarrel) = partition
+        ((areIntersecting $ playerToCircle player) . shotToCircle)
+        barrel
+
+registerHits :: ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
+registerHits (shots, playersWithBarrels) =
+    ( map (registerHit players) shots
+    , [ (player, map (registerHit $ delete player players) barrel)
+      | (player, barrel) <- playersWithBarrels
+      ]
+    )
+    where players = fsts playersWithBarrels
+
+registerHit :: [Player] -> Shot -> Shot
+registerHit players shot
+    | any ((areIntersecting $ shotToCircle shot) . playerToCircle) players
+    = setShotHit shot
+    | otherwise
+    = shot
+
+updateShots
+    :: DeltaTime -> ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
+updateShots dt (shots, playersWithBarrels) =
+    ( map (updateShot dt) shots
+    , mapSecond (map (updateShot dt)) playersWithBarrels
+    )
+
+triggerShots
+    :: [Event] -> ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
+triggerShots events (shots, playersWithBarrels) =
+    ( shots
+    , [ (player, barrel ++ maybeToList (triggerShot events player))
+      | (player, barrel) <- playersWithBarrels
+      ]
+    )
+
+updatePlayers
+    :: [Event]
+    -> DeltaTime
+    -> Bounds2D
+    -> ([Shot], [(Player, Barrel)])
+    -> ([Shot], [(Player, Barrel)])
+updatePlayers events dt bounds (shots, playersWithBarrels) =
+    (shots, mapFirst (updatePlayer events dt bounds) playersWithBarrels)
+
+mapFirst :: (a -> c) -> [(a, b)] -> [(c, b)]
+mapFirst f xys = [ (f x, y) | (x, y) <- xys ]
+
+mapSecond :: (b -> c) -> [(a, b)] -> [(a, c)]
+mapSecond f xys = [ (x, f y) | (x, y) <- xys ]
 
 isClosedEvent :: Event -> Bool
 isClosedEvent (Event _ (WindowClosedEvent _)) = True
 isClosedEvent _                               = False
 
 isFinished :: Game -> Bool
-isFinished (Game _ _ _ isFinished) = isFinished
+isFinished (Game _ _ isFinished) = isFinished

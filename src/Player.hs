@@ -7,12 +7,13 @@ module Player
     , toDrawablePlayer
     , updatePlayer
     , triggerShot
+    , playerToCircle
     )
 where
 
 import           Space
 import           Shot
-import           Shape
+import           Circle
 import           SDL
 import           Data.Word                      ( Word8
                                                 , Word32
@@ -32,7 +33,7 @@ type Direction1D = Float
 -- axis. Keep the rotation to cover the case when the aim stick is moved to the
 -- default position (0, 0).
 data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
-data Player = Player Shape Aim2D JoystickID deriving (Show, Eq)
+data Player = Player Circle Velocity2D Aim2D JoystickID deriving (Show, Eq)
 
 playerSide :: Size1D
 playerSide = 32
@@ -49,11 +50,11 @@ playerTextureFile = "gen/player.bmp"
 
 createPlayer :: Position2D -> Angle2D -> JoystickID -> Player
 createPlayer pos angle joystickId =
-    Player (Shape pos (V2 0 0)) (Aim2D 0 0 angle) joystickId
+    Player (Circle pos (playerSide / 2)) (V2 0 0) (Aim2D 0 0 angle) joystickId
 
 toDrawablePlayer :: Player -> (FilePath, Maybe (Rectangle CInt), CDouble)
-toDrawablePlayer (Player shape (Aim2D _ _ angle) _) =
-    toDrawableShape shape angle playerSize playerTextureFile
+toDrawablePlayer (Player circle _ (Aim2D _ _ angle) _) =
+    toDrawableCircle circle angle playerTextureFile
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle
@@ -69,8 +70,8 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
         abs direction < minAxisPosition * axisPositionToVelocity
 
 updatePlayer :: [Event] -> DeltaTime -> Bounds2D -> Player -> Player
-updatePlayer events dt bounds (Player (Shape position velocity) aim joystickId)
-    = Player (Shape newPosition newVelocity) newAim joystickId
+updatePlayer events dt bounds (Player (Circle position radius) velocity aim joystickId)
+    = Player (Circle newPosition radius) newVelocity newAim joystickId
   where
     axisEvents =
         map (joyAxisEventAxis &&& joyAxisEventValue)
@@ -103,7 +104,7 @@ updateVelocity (V2 x y) (axisId, axisPosition) =
             _ -> V2 x y
 
 triggerShot :: [Event] -> Player -> Maybe Shot
-triggerShot events (Player (Shape position _) (Aim2D _ _ angle) joystickId) 
+triggerShot events (Player (Circle position _) _ (Aim2D _ _ angle) joystickId)
     | any (== (rightBumberButtonId, JoyButtonPressed))
         $ map (joyButtonEventButton &&& joyButtonEventState)
         $ filter ((joystickId ==) . joyButtonEventWhich)
@@ -116,3 +117,6 @@ toJoyButton :: Event -> Maybe JoyButtonEventData
 toJoyButton (Event _ (JoyButtonEvent joyButtonEventData)) =
     Just joyButtonEventData
 toJoyButton _ = Nothing
+
+playerToCircle :: Player -> Circle
+playerToCircle (Player circle _ _ _) = circle

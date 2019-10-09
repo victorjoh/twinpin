@@ -1,26 +1,31 @@
 module Shot
     ( Shot
     , shotSpeed
-    , shotTextureFile
+    , shotTextureFiles
     , createShot
     , toDrawableShot
     , updateShot
     , isShotWithinBounds
+    , shotToCircle
+    , setShotHit
     )
 where
 
 import           Space
-import           Shape
+import           Circle
 import           Foreign.C.Types
 import           SDL
 
-newtype Shot = Shot Shape deriving (Show, Eq)
+data Shot = Shot Circle Velocity2D FilePath deriving (Show, Eq)
 
 shotSpeed :: Speed
 shotSpeed = 0.7
 
-shotTextureFile :: FilePath
-shotTextureFile = "gen/shot.bmp"
+defaultTexture = "gen/shot.bmp"
+hitTexture = "gen/shot-hit.bmp"
+
+shotTextureFiles :: [FilePath]
+shotTextureFiles = [defaultTexture, hitTexture]
 
 side :: Size1D
 side = 32 / 3
@@ -29,15 +34,25 @@ size :: Size2D
 size = V2 side side
 
 createShot :: Position2D -> Angle2D -> Shot
-createShot position angle = Shot $ Shape position (toVelocity angle shotSpeed)
+createShot position angle = Shot (Circle position (side / 2))
+                                 (toVelocity angle shotSpeed)
+                                 defaultTexture
 
 toDrawableShot :: Shot -> (FilePath, Maybe (Rectangle CInt), CDouble)
-toDrawableShot (Shot shape) = toDrawableShape shape 0 size shotTextureFile
+toDrawableShot (Shot cicle _ texture) = toDrawableCircle cicle 0 texture
 
 updateShot :: DeltaTime -> Shot -> Shot
-updateShot dt (Shot (Shape position velocity)) =
-    Shot $ Shape (updatePosition2D position velocity dt) velocity
+updateShot dt (Shot (Circle position radius) velocity texture) = Shot
+    (Circle (updatePosition2D position velocity dt) radius)
+    velocity
+    texture
 
 isShotWithinBounds :: Bounds2D -> Shot -> Bool
-isShotWithinBounds bounds (Shot (Shape position _)) =
+isShotWithinBounds bounds (Shot (Circle position _) _ _) =
     isWithinBounds2D position $ increaseBounds2D bounds size
+
+shotToCircle :: Shot -> Circle
+shotToCircle (Shot circle _ _) = circle
+
+setShotHit :: Shot -> Shot
+setShotHit (Shot circle velocity texture) = Shot circle velocity hitTexture
