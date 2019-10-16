@@ -1,9 +1,9 @@
 # twinpin
 ![twinpin screenshot](images/screenshot.png "twinpin screenshot")
 
-twinpin is a minimal twin-stick arena shooter. The player controls the character
-with a gamepad. So far I have only tried it with a Sony DualShock 4 V2. I
-develop this game to satisfy my functional programming itch.
+twinpin is a minimal twin-stick arena shooter. The two players control their
+characters with gamepads. So far I have only tried it with a Sony DualShock 4
+V2. I develop this game to satisfy my functional programming itch.
 
 ## Build dependencies
 Stack is used to build the project. Stack will download most of the other build
