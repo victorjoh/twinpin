@@ -70,8 +70,11 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
         abs direction < minAxisPosition * axisPositionToVelocity
 
 updatePlayer :: [Event] -> DeltaTime -> Bounds2D -> Player -> Player
-updatePlayer events dt bounds (Player (Circle position radius) velocity aim joystickId)
-    = Player (Circle newPosition radius) newVelocity newAim joystickId
+updatePlayer events dt bounds (Player circle velocity aim joystickId) = Player
+    newCircle
+    newVelocity
+    newAim
+    joystickId
   where
     axisEvents =
         map (joyAxisEventAxis &&& joyAxisEventValue)
@@ -79,9 +82,7 @@ updatePlayer events dt bounds (Player (Circle position radius) velocity aim joys
             $ mapMaybe toJoyAxis events
     newVelocity = foldl updateVelocity velocity axisEvents
     newAim      = foldl updateAim aim axisEvents
-    newPosition = limitPosition2D
-        (updatePosition2D position newVelocity dt)
-        (decreaseBounds2D bounds playerSize)
+    newCircle   = updateCollidingCirclePosition newVelocity dt bounds circle
 
 toJoyAxis :: Event -> Maybe JoyAxisEventData
 toJoyAxis (Event _ (JoyAxisEvent joyAxisEventData)) = Just joyAxisEventData

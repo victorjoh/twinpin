@@ -42,14 +42,12 @@ toDrawableShot :: Shot -> (FilePath, Maybe (Rectangle CInt), CDouble)
 toDrawableShot (Shot cicle _ texture) = toDrawableCircle cicle 0 texture
 
 updateShot :: DeltaTime -> Shot -> Shot
-updateShot dt (Shot (Circle position radius) velocity texture) = Shot
-    (Circle (updatePosition2D position velocity dt) radius)
-    velocity
-    texture
+updateShot dt (Shot circle velocity texture) =
+    Shot (updateCirclePosition velocity dt circle) velocity texture
 
 isShotWithinBounds :: Bounds2D -> Shot -> Bool
-isShotWithinBounds bounds (Shot (Circle position _) _ _) =
-    isWithinBounds2D position $ increaseBounds2D bounds size
+isShotWithinBounds bounds (Shot circle _ _) =
+    isCircleWithinBounds bounds circle
 
 shotToCircle :: Shot -> Circle
 shotToCircle (Shot circle _ _) = circle

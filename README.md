@@ -1,7 +1,7 @@
 # twinpin
 ![twinpin screenshot](images/screenshot.png "twinpin screenshot")
 
-twinpin is a minimal twin-stick arena shooter. The two players control their
+twinpin is a minimal twin-stick shooter. The two players control their
 characters with gamepads. So far I have only tried it with a Sony DualShock 4
 V2. I develop this game to satisfy my functional programming itch.
 
