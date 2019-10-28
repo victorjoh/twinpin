@@ -97,3 +97,23 @@ spec = do
     describe "decreaseBounds1D" $ do
         it "decreases the bounds equally on both sides" $ do
             decreaseBounds1D (0, 4) 2 `shouldBe` (1, 3)
+
+    describe "getClosestTo2D" $ do
+        it "returns the first point when it is closest to the target" $ do
+            getClosestTo2D (V2 10 50) (V2 16 45) (V2 15 32)
+                `shouldBe` (V2 16 45)
+        it "returns the second point when it is closest to the target"
+            $          do
+                           getClosestTo2D (V2 10 50) (V2 15 32) (V2 16 45)
+            `shouldBe` (V2 16 45)
+        it
+                (  "does not matter if one of the points is further away from"
+                ++ " origo than the target"
+                )
+            $          do
+                           getClosestTo2D (V2 195 95) (V2 205 105) (V2 200 100)
+            `shouldBe` (V2 200 100)
+
+    describe "getLine2D" $ do
+        it "finds the line between two positions" $ do
+            getLine2D (V2 5 2) (V2 6 4) `shouldBe` (-2, 1, 8)

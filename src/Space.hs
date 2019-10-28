@@ -19,6 +19,9 @@ type Velocity2D = V2 Velocity1D
 type Size2D = V2 Size1D
 data Bounds2D = Bounds2D Bounds1D Bounds1D deriving (Show, Eq)
 
+-- on the form (a, b, c) where ax + by + c = 0
+type Line2D = (Float, Float, Float)
+
 toVelocity :: Angle2D -> Speed -> Velocity2D
 toVelocity angle speed = V2 (axisVelocity cos) (axisVelocity sin)
     where axisVelocity trig = (speed * (trig ((pi / 180) * angle)))
@@ -63,3 +66,13 @@ decreaseBounds2D bounds size = increaseBounds2D bounds (-size)
 
 decreaseBounds1D :: Bounds1D -> Size1D -> Bounds1D
 decreaseBounds1D bounds size = increaseBounds1D bounds (-size)
+
+getClosestTo2D :: Position2D -> Position2D -> Position2D -> Position2D
+getClosestTo2D target p1 p2 | distance target p1 < distance target p2 = p1
+                            | otherwise                               = p2
+
+getLine2D :: Position2D -> Position2D -> Line2D
+getLine2D (V2 x1 y1) (V2 x2 y2) = (y1 - y2, x2 - x1, x1 * y2 - x2 * y1)
+
+epsilon :: Float
+epsilon = 1.19209290e-07

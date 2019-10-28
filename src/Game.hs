@@ -16,6 +16,7 @@ import           Data.List                      ( delete
                                                 , partition
                                                 )
 import           Circle                         ( areIntersecting )
+import           Data.Tuple.Extra               ( first )
 
 data Game = Game Time ([Shot], [(Player, Barrel)]) Bool
 
@@ -127,11 +128,49 @@ updatePlayers
     -> Bounds2D
     -> ([Shot], [(Player, Barrel)])
     -> ([Shot], [(Player, Barrel)])
-updatePlayers events dt bounds (shots, playersWithBarrels) =
-    (shots, mapFirst (updatePlayer events dt bounds) playersWithBarrels)
+updatePlayers events dt bounds (shots, player : playersWithBarrels) =
+    (shots, updatePlayers' events dt bounds [] player playersWithBarrels)
 
-mapFirst :: (a -> c) -> [(a, b)] -> [(c, b)]
-mapFirst f xys = [ (f x, y) | (x, y) <- xys ]
+updatePlayers'
+    :: [Event]
+    -> DeltaTime
+    -> Bounds2D
+    -> [(Player, Barrel)]
+    -> (Player, Barrel)
+    -> [(Player, Barrel)]
+    -> [(Player, Barrel)]
+updatePlayers' events dt bounds updated toBeUpdated [] =
+    updated
+        ++ [ (first
+                 (updatePlayer events
+                               dt
+                               bounds
+                               (map playerToCircle $ fsts updated)
+                 )
+                 toBeUpdated
+             )
+           ]
+updatePlayers' events dt bounds updated toBeUpdated (next : notUpdated) =
+    updatePlayers'
+        events
+        dt
+        bounds
+        (  updated
+        ++ [ (first
+                 (updatePlayer
+                     events
+                     dt
+                     bounds
+                     (map playerToCircle
+                          (fsts updated ++ fsts (next : notUpdated))
+                     )
+                 )
+                 toBeUpdated
+             )
+           ]
+        )
+        next
+        notUpdated
 
 mapSecond :: (b -> c) -> [(a, b)] -> [(a, c)]
 mapSecond f xys = [ (x, f y) | (x, y) <- xys ]

@@ -181,3 +181,16 @@ spec = do
                 50
                 (V2 50 50)
                 (createGame (V2 50 50))
+        it "makes sure that two players collide" $ do
+            toDrawableGame
+                    (updateGame
+                        [Event 0 (JoyAxisEvent (JoyAxisEventData 0 0 20000))]
+                        1000
+                        (V2 200 100)
+                        (createGame (V2 200 100))
+                    )
+                `shouldContain` [ ( "gen/player.bmp"
+                                  , Just (Rectangle (P (V2 104 34)) (V2 32 32))
+                                  , 0
+                                  )
+                                ]

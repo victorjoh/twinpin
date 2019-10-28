@@ -12,6 +12,7 @@ import           Space
 import           Foreign.C.Types
 import           SDL.Video.Renderer             ( Rectangle(..) )
 import           SDL.Vect
+import           Data.Maybe
 
 type Radius = Float
 data Circle = Circle Position2D Radius deriving (Show, Eq)
@@ -51,10 +52,54 @@ updateCirclePosition velocity dt (Circle oldPosition radius) =
     Circle (updatePosition2D oldPosition velocity dt) radius
 
 updateCollidingCirclePosition
-    :: Velocity2D -> DeltaTime -> Bounds2D -> Circle -> Circle
-updateCollidingCirclePosition velocity dt bounds (Circle oldPosition radius) =
-    Circle
-        (limitPosition2D (updatePosition2D oldPosition velocity dt)
-                         (decreaseBounds2D bounds $ boundingBoxSize radius)
+    :: Velocity2D -> DeltaTime -> Bounds2D -> [Circle] -> Circle -> Circle
+updateCollidingCirclePosition velocity dt bounds obstacles (Circle oldPosition radius)
+    = Circle
+        (limitPosition2D
+            (collideWithCircles obstacles
+                                radius
+                                oldPosition
+                                (updatePosition2D oldPosition velocity dt)
+            )
+            (decreaseBounds2D bounds $ boundingBoxSize radius)
         )
         radius
+
+collideWithCircles
+    :: [Circle] -> Radius -> Position2D -> Position2D -> Position2D
+collideWithCircles obstacles radius oldPosition targetPosition =
+    foldr (getClosestTo2D oldPosition) targetPosition $ concat $ map
+        (findCollisionPoints radius oldPosition targetPosition)
+        (filter (isInFrontOf oldPosition targetPosition) obstacles)
+
+isInFrontOf :: Position2D -> Position2D -> Circle -> Bool
+isInFrontOf base target (Circle obstacle _) =
+    (target - base) `dot` (obstacle - base) > 0
+
+findCollisionPoints
+    :: Radius -> Position2D -> Position2D -> Circle -> [Position2D]
+findCollisionPoints radius oldPos targetPos (Circle obstaclePos obstacleRadius)
+    = map
+        (+ obstaclePos)
+        (findCircleLineIntersections
+            (radius + obstacleRadius)
+            (getLine2D (oldPos - obstaclePos) (targetPos - obstaclePos))
+        )
+
+-- the circle is centered in origin
+findCircleLineIntersections :: Radius -> Line2D -> [Position2D]
+findCircleLineIntersections r (a, b, c) =
+    let x0 = -a * c / (a * a + b * b)
+        y0 = -b * c / (a * a + b * b)
+    in  if (c * c > r * r * (a * a + b * b) + epsilon)
+            then []
+            else if (abs (c * c - r * r * (a * a + b * b)) < epsilon)
+                then [V2 x0 y0]
+                else
+                    let d    = r * r - c * c / (a * a + b * b)
+                        mult = sqrt (d / (a * a + b * b))
+                        ax   = x0 + b * mult
+                        bx   = x0 - b * mult
+                        ay   = y0 - a * mult
+                        by   = y0 + a * mult
+                    in  [V2 ax ay, V2 bx by]

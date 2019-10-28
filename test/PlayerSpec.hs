@@ -31,6 +31,7 @@ spec = do
                         ]
                         50
                         (Bounds2D (0, 250) (0, 200))
+                        []
                         (createPlayer (V2 40 50) 0 0)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 45 60) 0 0)
@@ -50,6 +51,7 @@ spec = do
                               ]
                               50
                               (Bounds2D (0, 250) (0, 200))
+                              []
                               (updatePlayer
                                   -- first give the player some velocity to see
                                   -- that the velocity is set to (0, 0) later on
@@ -64,6 +66,7 @@ spec = do
                                   ]
                                   50
                                   (Bounds2D (0, 250) (0, 200))
+                                  []
                                   (createPlayer (V2 40 50) 0 0)
                               )
                           )
@@ -74,6 +77,7 @@ spec = do
                         []
                         25
                         (Bounds2D (0, 250) (0, 200))
+                        []
                         (updatePlayer
                             [ Event
                                 0
@@ -84,6 +88,7 @@ spec = do
                             ]
                             25
                             (Bounds2D (0, 250) (0, 200))
+                            []
                             (createPlayer (V2 40 50) 0 0)
                         )
                     )
@@ -96,6 +101,7 @@ spec = do
                         ]
                         50
                         (Bounds2D (0, 60) (0, 66))
+                        []
                         (createPlayer (V2 40 50) 0 0)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 44 50) 0 0)
@@ -107,6 +113,7 @@ spec = do
                         ]
                         500
                         (Bounds2D (0, 250) (0, 200))
+                        []
                         (createPlayer (V2 40 50) 0 0)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 40 50) (-45) 0)
@@ -124,6 +131,7 @@ spec = do
                                    ]
                                    500
                                    (Bounds2D (0, 250) (0, 200))
+                                   []
                                    (createPlayer (V2 40 50) 0 0)
                                )
             `shouldBe` toDrawablePlayer (createPlayer (V2 40 50) 0 0)
@@ -133,6 +141,7 @@ spec = do
                         [Event 0 (JoyAxisEvent (JoyAxisEventData 0 2 10000))]
                         50
                         (Bounds2D (0, 250) (0, 200))
+                        []
                         (createPlayer (V2 40 50) 0 0)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 40 50) 0 0)
@@ -142,6 +151,7 @@ spec = do
                         [Event 0 (JoyAxisEvent (JoyAxisEventData 0 0 20000))]
                         50
                         (Bounds2D (0, 250) (0, 200))
+                        []
                         (createPlayer (V2 40 50) 0 1)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 40 50) 0 0)
