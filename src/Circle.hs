@@ -16,6 +16,7 @@ import           Data.Maybe
 
 type Radius = Float
 data Circle = Circle Position2D Radius deriving (Show, Eq)
+data Hurdle = CircleCollision | BoundsCollision | MovementFinished
 
 -- Converts to something that is easily drawable by SDL. Circle has coordinates 
 -- on the middle of the texture, whereas the SDL representation has the
@@ -54,39 +55,79 @@ updateCirclePosition velocity dt (Circle oldPosition radius) =
 updateCollidingCirclePosition
     :: Velocity2D -> DeltaTime -> Bounds2D -> [Circle] -> Circle -> Circle
 updateCollidingCirclePosition velocity dt bounds obstacles (Circle oldPosition radius)
-    = Circle
-        (limitPosition2D
-            (collideWithCircles obstacles
-                                radius
-                                oldPosition
-                                (updatePosition2D oldPosition velocity dt)
-            )
-            (decreaseBounds2D bounds $ boundingBoxSize radius)
-        )
-        radius
+    = let target = (updatePosition2D oldPosition velocity dt)
+          -- incorporate circle radius in bounds and obstacles dimensions so we
+          -- instead evaluate a single point moving through space
+          centerBounds = (decreaseBounds2D bounds $ boundingBoxSize radius)
+          centerObstacles = (map (increaseRadius radius) obstacles)
+          (hurdlePosition, hurdleType) = findNextCollision oldPosition
+                                                           target
+                                                           centerBounds
+                                                           centerObstacles
+      in  case hurdleType of
+              BoundsCollision -> Circle
+                  (moveAlongBounds hurdlePosition
+                                   target
+                                   centerBounds
+                                   centerObstacles
+                  )
+                  radius
+              CircleCollision  -> Circle hurdlePosition radius
+              MovementFinished -> Circle hurdlePosition radius
 
-collideWithCircles
-    :: [Circle] -> Radius -> Position2D -> Position2D -> Position2D
-collideWithCircles obstacles radius oldPosition targetPosition =
-    foldr (getClosestTo2D oldPosition) targetPosition $ concat $ map
-        (findCollisionPoints radius oldPosition targetPosition)
-        (filter (isInFrontOf oldPosition targetPosition) obstacles)
+findNextCollision
+    :: Position2D -> Position2D -> Bounds2D -> [Circle] -> (Position2D, Hurdle)
+findNextCollision current target bounds obstacles =
+    let nextBoundsHurdle           = collideWithBounds current target bounds
+        nextCircleHurdle           = collideWithCircles current target obstacles
+        distanceToTarget           = distance current target
+        distanceToNextBoundsHurdle = distance current nextBoundsHurdle
+        distanceToNextCircleHurdle = distance current nextCircleHurdle
+    in  if distanceToNextBoundsHurdle
+               <  distanceToTarget
+               && distanceToNextBoundsHurdle
+               <  distanceToNextCircleHurdle
+            then (nextBoundsHurdle, BoundsCollision)
+            else if distanceToNextCircleHurdle < distanceToTarget
+                then (nextCircleHurdle, CircleCollision)
+                else (target, MovementFinished)
+
+increaseRadius :: Float -> Circle -> Circle
+increaseRadius increase (Circle position radius) =
+    Circle position (radius + increase)
+
+moveAlongBounds
+    :: Position2D -> Position2D -> Bounds2D -> [Circle] -> Position2D
+moveAlongBounds current target bounds obstacles =
+    collideWithCircles current (limitPosition2D target bounds) obstacles
+
+collideWithBounds :: Position2D -> Position2D -> Bounds2D -> Position2D
+collideWithBounds current target bounds =
+    foldr (getClosestTo2D current) target
+        $ mapMaybe (getLineIntersection2D (getLine2D current target))
+        $ boundsToLines2D bounds
+
+collideWithCircles :: Position2D -> Position2D -> [Circle] -> Position2D
+collideWithCircles current target obstacles =
+    foldr (getClosestTo2D current) target $ concat $ map
+        (findCollisionPoints current target)
+        (filter (isInFrontOf current target) obstacles)
 
 isInFrontOf :: Position2D -> Position2D -> Circle -> Bool
 isInFrontOf base target (Circle obstacle _) =
     (target - base) `dot` (obstacle - base) > 0
 
-findCollisionPoints
-    :: Radius -> Position2D -> Position2D -> Circle -> [Position2D]
-findCollisionPoints radius oldPos targetPos (Circle obstaclePos obstacleRadius)
-    = map
-        (+ obstaclePos)
-        (findCircleLineIntersections
-            (radius + obstacleRadius)
-            (getLine2D (oldPos - obstaclePos) (targetPos - obstaclePos))
-        )
+findCollisionPoints :: Position2D -> Position2D -> Circle -> [Position2D]
+findCollisionPoints current target (Circle obstaclePos obstacleRadius) = map
+    (+ obstaclePos)
+    (findCircleLineIntersections
+        obstacleRadius
+        (getLine2D (current - obstaclePos) (target - obstaclePos))
+    )
 
 -- the circle is centered in origin
+-- Converted from
+-- https://cp-algorithms.com/geometry/circle-line-intersection.html
 findCircleLineIntersections :: Radius -> Line2D -> [Position2D]
 findCircleLineIntersections r (a, b, c) =
     let x0 = -a * c / (a * a + b * b)

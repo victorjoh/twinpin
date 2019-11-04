@@ -27,6 +27,15 @@ spec = do
         it "moves a position given a velocity and a time" $ do
             updatePosition2D (V2 1 4) (V2 2 (-1)) 2 `shouldBe` (V2 5 2)
 
+    describe "boundsToLines2D" $ do
+        it "creates lines from bounds" $ do
+            boundsToLines2D (Bounds2D (10, 100) (20, 200))
+                `shouldContain` [ (-1, 0 , 10)
+                                , (-1, 0 , 100)
+                                , (0 , -1, 20)
+                                , (0 , -1, 200)
+                                ]
+
     describe "isWithinBounds2D" $ do
         it "returns true if a position is within the bounds" $ do
             isWithinBounds2D (V2 1 3) (Bounds2D (0, 1) (2, 3)) `shouldBe` True
@@ -52,6 +61,14 @@ spec = do
             isWithinBounds1D 2.5 (2, 3) `shouldBe` True
         it "returns false if above the bounds" $ do
             isWithinBounds1D 3.5 (2, 3) `shouldBe` False
+
+    describe "getLineIntersection2D" $ do
+        it "returns the point of intersection if it exists" $ do
+            getLineIntersection2D (-2, 1, 1) (1, -1, 1) `shouldBe` Just (V2 2 3)
+        it "returns nothing if the lines are parallel" $ do
+            getLineIntersection2D (2, -2, 4) (1, -1, 1) `shouldBe` Nothing
+        it "returns nothing if it is the same line" $ do
+            getLineIntersection2D (2, -2, 2) (1, -1, 1) `shouldBe` Nothing
 
     describe "limitPosition2D" $ do
         it "does not affect position already within the bounds" $ do

@@ -17,6 +17,7 @@ type Angle2D = Float
 type Position2D = V2 Position1D
 type Velocity2D = V2 Velocity1D
 type Size2D = V2 Size1D
+type LineSegment2D = (Position2D, Position2D)
 data Bounds2D = Bounds2D Bounds1D Bounds1D deriving (Show, Eq)
 
 -- on the form (a, b, c) where ax + by + c = 0
@@ -38,6 +39,10 @@ toPixelAngle = realToFrac
 updatePosition2D :: Position2D -> Velocity2D -> DeltaTime -> Position2D
 updatePosition2D position velocity dt = position + velocity * fromIntegral dt
 
+boundsToLines2D :: Bounds2D -> [Line2D]
+boundsToLines2D (Bounds2D (xl, xu) (yl, yu)) =
+    [(-1, 0, xl), (-1, 0, xu), (0, -1, yl), (0, -1, yu)]
+
 isWithinBounds2D :: Position2D -> Bounds2D -> Bool
 isWithinBounds2D (V2 px py) (Bounds2D bx by) =
     isWithinBounds1D px bx && isWithinBounds1D py by
@@ -45,6 +50,17 @@ isWithinBounds2D (V2 px py) (Bounds2D bx by) =
 isWithinBounds1D :: Position1D -> Bounds1D -> Bool
 isWithinBounds1D position (lowerBound, upperBound) =
     position >= lowerBound && position <= upperBound
+
+-- if the lines are the same or parallel, nothing is returned.
+-- Converted from https://cp-algorithms.com/geometry/lines-intersection.html
+getLineIntersection2D :: Line2D -> Line2D -> Maybe Position2D
+getLineIntersection2D (a1, b1, c1) (a2, b2, c2) =
+    let determinant m1 m2 m3 m4 = m1 * m4 - m2 * m3
+        zn = determinant a1 b1 a2 b2
+    in  if abs zn < epsilon
+            then Nothing
+            else Just $ V2 (-(determinant c1 b1 c2 b2) / zn)
+                           (-(determinant a1 c1 a2 c2) / zn)
 
 limitPosition2D :: Position2D -> Bounds2D -> Position2D
 limitPosition2D (V2 px py) (Bounds2D bx by) =
