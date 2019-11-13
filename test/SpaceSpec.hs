@@ -1,9 +1,12 @@
+{-# LANGUAGE ImplicitParams #-}
+
 module SpaceSpec where
 
 import           Test.Hspec
 import           Space
 import           SDL.Vect
 import           Foreign.C.Types
+import           Test.HUnit.Approx
 
 spec :: Spec
 spec = do
@@ -35,6 +38,11 @@ spec = do
                                 , (0 , -1, 20)
                                 , (0 , -1, 200)
                                 ]
+
+    describe "offsetBounds2D" $ do
+        it "offsets the bounds given a position" $ do
+            offsetBounds2D (V2 3 (-4)) (Bounds2D (1, 2) (7, 9))
+                `shouldBe` (Bounds2D (4, 5) (3, 5))
 
     describe "isWithinBounds2D" $ do
         it "returns true if a position is within the bounds" $ do
@@ -115,22 +123,73 @@ spec = do
         it "decreases the bounds equally on both sides" $ do
             decreaseBounds1D (0, 4) 2 `shouldBe` (1, 3)
 
-    describe "getClosestTo2D" $ do
-        it "returns the first point when it is closest to the target" $ do
-            getClosestTo2D (V2 10 50) (V2 16 45) (V2 15 32)
-                `shouldBe` (V2 16 45)
-        it "returns the second point when it is closest to the target"
-            $          do
-                           getClosestTo2D (V2 10 50) (V2 15 32) (V2 16 45)
-            `shouldBe` (V2 16 45)
-        it
-                (  "does not matter if one of the points is further away from"
-                ++ " origo than the target"
-                )
-            $          do
-                           getClosestTo2D (V2 195 95) (V2 205 105) (V2 200 100)
-            `shouldBe` (V2 200 100)
-
     describe "getLine2D" $ do
         it "finds the line between two positions" $ do
             getLine2D (V2 5 2) (V2 6 4) `shouldBe` (-2, 1, 8)
+
+    describe "angleDifference2D" $ do
+        let ?epsilon = epsilon
+        it "finds the difference between two angles" $ do
+            angleDifference2D 3 2 @?~ 1
+        it "can handle negative and positive pi" $ do
+            angleDifference2D pi (-pi) @?~ 0
+        it "can handle from positive to negative numbers" $ do
+            angleDifference2D (pi * 3 / 4) (-pi * 3 / 4) @?~ -pi / 2
+        it "can handle from negative to positive numbers" $ do
+            angleDifference2D (-pi * 3 / 4) (pi * 3 / 4) @?~ pi / 2
+        it "can handle opposite angles" $ do
+            abs (angleDifference2D (pi / 2) (-pi / 2)) @?~ pi
+
+    describe "offsetLine2D" $ do
+        it "does not make any change if the offset is 0" $ do
+            offsetLine2D (V2 0 0) (1, 2, 3) `shouldBe` (1, 2, 3)
+        it "offsets a horizontal line" $ do
+            offsetLine2D (V2 5 7) (0, 2, 6) `shouldBe` (0, 2, -8)
+        it "offsets a vertical line by an offset" $ do
+            offsetLine2D (V2 5 7) (2, 0, 6) `shouldBe` (2, 0, -4)
+        it "offsets a line that is not colinear to the base vectors" $ do
+            offsetLine2D (V2 2 (-1)) (2, 1, (-1)) `shouldBe` (2, 1, -4)
+
+    describe "offsetDistanceToOrigin2D" $ do
+        it "offsets a horizontal line above the origin" $ do
+            offsetDistanceToOrigin2D (-1) (0, -1, 3) `shouldBe` (0, -1, 2)
+        it "offsets a horizontal line under the origin" $ do
+            offsetDistanceToOrigin2D (-1) (0, -1, -3) `shouldBe` (0, -1, -2)
+        it "offsets a vertical line to the left of the origin" $ do
+            offsetDistanceToOrigin2D (-2) (-1, 0, -5) `shouldBe` (-1, 0, -3)
+        it "offsets a vertical line to the right of the origin" $ do
+            offsetDistanceToOrigin2D (-2) (-1, 0, 5) `shouldBe` (-1, 0, 3)
+        it
+                ("when moving towards the origin with an offset bigger than the"
+                ++ "distance the line will cross the origin"
+                )
+            $ do
+                  offsetDistanceToOrigin2D (-7) (-1, 0, 5) `shouldBe` (-1, 0, 0)
+
+    describe "isLineBetween2D" $ do
+        it "returns true if line crosses first vector" $ do
+            isLineBetween2D (V2 (-1) 2) (V2 2 1) (-1, 0, -10) `shouldBe` True
+        it "returns true no matter the order of the vectors" $ do
+            isLineBetween2D (V2 2 1) (V2 (-1) 2) (-1, 0, -10) `shouldBe` True
+        it "returns true if line crosses second vector" $ do
+            isLineBetween2D (V2 (-1) 2) (V2 2 1) (-1, 0, 10) `shouldBe` True
+        it "returns false if line does not cross any vector" $ do
+            isLineBetween2D (V2 (-1) 2) (V2 2 1) (0, -1, -1) `shouldBe` False
+        it "returns false no matter the order of the vectors" $ do
+            isLineBetween2D (V2 2 1) (V2 (-1) 2) (0, -1, -1) `shouldBe` False
+        it
+                ("can return false no matter if the vectors are above or below"
+                ++ " the x axis"
+                )
+            $ do
+                  isLineBetween2D (V2 (-2) (-1)) (V2 1 (-2)) (0, -1, 1)
+                      `shouldBe` False
+        it
+                (  "can return true no matter if the vectors are above or below"
+                ++ " the x axis"
+                )
+            $ do
+                  isLineBetween2D (V2 (-2) (-1)) (V2 1 (-2)) (0, -1, -1)
+                      `shouldBe` True
+
+

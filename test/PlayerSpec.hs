@@ -3,6 +3,7 @@ module PlayerSpec where
 import           Test.Hspec
 import           Player
 import           Space
+import           Circle
 import           Shot                           ( createShot )
 import           SDL.Vect
 import           SDL.Event
@@ -30,8 +31,7 @@ spec = do
                         , Event 0 (JoyAxisEvent (JoyAxisEventData 0 1 20000))
                         ]
                         50
-                        (Bounds2D (0, 250) (0, 200))
-                        []
+                        (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                         (createPlayer (V2 40 50) 0 0)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 45 60) 0 0)
@@ -50,8 +50,7 @@ spec = do
                                   (JoyAxisEvent (JoyAxisEventData 0 1 4000))
                               ]
                               50
-                              (Bounds2D (0, 250) (0, 200))
-                              []
+                              (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                               (updatePlayer
                                   -- first give the player some velocity to see
                                   -- that the velocity is set to (0, 0) later on
@@ -65,8 +64,7 @@ spec = do
                                       )
                                   ]
                                   50
-                                  (Bounds2D (0, 250) (0, 200))
-                                  []
+                                  (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                                   (createPlayer (V2 40 50) 0 0)
                               )
                           )
@@ -76,8 +74,7 @@ spec = do
                     (updatePlayer
                         []
                         25
-                        (Bounds2D (0, 250) (0, 200))
-                        []
+                        (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                         (updatePlayer
                             [ Event
                                 0
@@ -87,8 +84,7 @@ spec = do
                                 (JoyAxisEvent (JoyAxisEventData 0 1 20000))
                             ]
                             25
-                            (Bounds2D (0, 250) (0, 200))
-                            []
+                            (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                             (createPlayer (V2 40 50) 0 0)
                         )
                     )
@@ -100,8 +96,7 @@ spec = do
                         , Event 0 (JoyAxisEvent (JoyAxisEventData 0 1 20000))
                         ]
                         50
-                        (Bounds2D (0, 60) (0, 66))
-                        []
+                        (Obstacles (Bounds2D (0, 60) (0, 66)) [])
                         (createPlayer (V2 40 50) 0 0)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 44 50) 0 0)
@@ -112,8 +107,7 @@ spec = do
                         , Event 0 (JoyAxisEvent (JoyAxisEventData 0 4 (-10000)))
                         ]
                         500
-                        (Bounds2D (0, 250) (0, 200))
-                        []
+                        (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                         (createPlayer (V2 40 50) 0 0)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 40 50) (-45) 0)
@@ -130,8 +124,7 @@ spec = do
                                        (JoyAxisEvent (JoyAxisEventData 0 4 (-4000)))
                                    ]
                                    500
-                                   (Bounds2D (0, 250) (0, 200))
-                                   []
+                                   (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                                    (createPlayer (V2 40 50) 0 0)
                                )
             `shouldBe` toDrawablePlayer (createPlayer (V2 40 50) 0 0)
@@ -140,8 +133,7 @@ spec = do
                     (updatePlayer
                         [Event 0 (JoyAxisEvent (JoyAxisEventData 0 2 10000))]
                         50
-                        (Bounds2D (0, 250) (0, 200))
-                        []
+                        (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                         (createPlayer (V2 40 50) 0 0)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 40 50) 0 0)
@@ -150,8 +142,7 @@ spec = do
                     (updatePlayer
                         [Event 0 (JoyAxisEvent (JoyAxisEventData 0 0 20000))]
                         50
-                        (Bounds2D (0, 250) (0, 200))
-                        []
+                        (Obstacles (Bounds2D (0, 250) (0, 200)) [])
                         (createPlayer (V2 40 50) 0 1)
                     )
                 `shouldBe` toDrawablePlayer (createPlayer (V2 40 50) 0 0)

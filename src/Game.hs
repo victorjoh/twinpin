@@ -3,6 +3,7 @@ module Game where
 import           Player
 import           Shot
 import           Space
+import           Circle
 import           SDL
 import           Data.Word                      ( Word8
                                                 , Word32
@@ -16,9 +17,9 @@ import           Data.List                      ( delete
                                                 , partition
                                                 )
 import           Circle                         ( areIntersecting )
-import           Data.Tuple.Extra               ( first )
+import           Data.Bifunctor                 ( first )
 
-data Game = Game Time ([Shot], [(Player, Barrel)]) Bool
+data Game = Game Time ([Shot], [(Player, Barrel)]) Bool deriving Show
 
 -- Shots that still haven't left the players barrel after firing. These are
 -- separated from other shots to make sure that the player isn't immediately hit
@@ -50,8 +51,7 @@ toDrawableGame (Game _ (shots, playersWithBarrels) _) =
         ++ map toDrawableShot (allShots playersWithBarrels shots)
 
 allShots :: [(Player, Barrel)] -> [Shot] -> [Shot]
-allShots playersWithBarrels shots =
-    shots ++ concat (map snd playersWithBarrels)
+allShots playersWithBarrels shots = shots ++ concatMap snd playersWithBarrels
 
 updateGame :: [Event] -> Word32 -> V2 CInt -> Game -> Game
 updateGame events newWordTime (V2 bx by) (Game time movingObjects isFinished) =
@@ -142,10 +142,10 @@ updatePlayers'
 updatePlayers' events dt bounds updated toBeUpdated [] =
     updated
         ++ [ (first
-                 (updatePlayer events
-                               dt
-                               bounds
-                               (map playerToCircle $ fsts updated)
+                 (updatePlayer
+                     events
+                     dt
+                     (Obstacles bounds (map playerToCircle $ fsts updated))
                  )
                  toBeUpdated
              )
@@ -160,9 +160,11 @@ updatePlayers' events dt bounds updated toBeUpdated (next : notUpdated) =
                  (updatePlayer
                      events
                      dt
-                     bounds
-                     (map playerToCircle
-                          (fsts updated ++ fsts (next : notUpdated))
+                     (Obstacles
+                         bounds
+                         (map playerToCircle
+                              (fsts updated ++ fsts (next : notUpdated))
+                         )
                      )
                  )
                  toBeUpdated

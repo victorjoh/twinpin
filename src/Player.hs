@@ -49,8 +49,8 @@ playerTextureFile :: FilePath
 playerTextureFile = "gen/player.bmp"
 
 createPlayer :: Position2D -> Angle2D -> JoystickID -> Player
-createPlayer pos angle joystickId =
-    Player (Circle pos (playerSide / 2)) (V2 0 0) (Aim2D 0 0 angle) joystickId
+createPlayer pos angle =
+    Player (Circle pos (playerSide / 2)) (V2 0 0) (Aim2D 0 0 angle)
 
 toDrawablePlayer :: Player -> (FilePath, Maybe (Rectangle CInt), CDouble)
 toDrawablePlayer (Player circle _ (Aim2D _ _ angle) _) =
@@ -69,8 +69,8 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
     isCloseToDefault direction =
         abs direction < minAxisPosition * axisPositionToVelocity
 
-updatePlayer :: [Event] -> DeltaTime -> Bounds2D -> [Circle] -> Player -> Player
-updatePlayer events dt bounds obstacles (Player circle velocity aim joystickId)
+updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
+updatePlayer events dt obstacles (Player circle velocity aim joystickId)
     = Player newCircle newVelocity newAim joystickId
   where
     axisEvents =
@@ -80,7 +80,7 @@ updatePlayer events dt bounds obstacles (Player circle velocity aim joystickId)
     newVelocity = foldl updateVelocity velocity axisEvents
     newAim      = foldl updateAim aim axisEvents
     newCircle =
-        updateCollidingCirclePosition newVelocity dt bounds obstacles circle
+        updateCollidingCirclePosition newVelocity dt obstacles circle
 
 toJoyAxis :: Event -> Maybe JoyAxisEventData
 toJoyAxis (Event _ (JoyAxisEvent joyAxisEventData)) = Just joyAxisEventData
@@ -104,7 +104,7 @@ updateVelocity (V2 x y) (axisId, axisPosition) =
 
 triggerShot :: [Event] -> Player -> Maybe Shot
 triggerShot events (Player (Circle position _) _ (Aim2D _ _ angle) joystickId)
-    | any (== (rightBumberButtonId, JoyButtonPressed))
+    | elem (rightBumberButtonId, JoyButtonPressed)
         $ map (joyButtonEventButton &&& joyButtonEventState)
         $ filter ((joystickId ==) . joyButtonEventWhich)
         $ mapMaybe toJoyButton events

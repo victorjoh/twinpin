@@ -41,6 +41,7 @@ library:
   - containers
   - extra
   - TypeCompose
+  - relude
 
 executables:
   twinpin-exe:
@@ -68,3 +69,4 @@ tests:
     - hspec
     - sdl2
     - extra
+    - HUnit-approx
