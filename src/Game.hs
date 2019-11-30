@@ -16,7 +16,6 @@ import           Data.Zip                       ( fsts )
 import           Data.List                      ( delete
                                                 , partition
                                                 )
-import           Circle                         ( areIntersecting )
 import           Data.Bifunctor                 ( first )
 
 data Game = Game Time ([Shot], [(Player, Barrel)]) Bool deriving Show

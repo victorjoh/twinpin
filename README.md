@@ -66,7 +66,30 @@ cabal update
 as written in [this github issue for Haskell IDE
 Engine](https://github.com/haskell/haskell-ide-engine/issues/658).
 
-# twinpin code architecture
-The entry point is found in app/Main.hs. Main.hs contains all the IO. Main.hs
-communicates with src/Game.hs. Game.hs is responsible for updating the game
-state given some user input.
+## twinpin code architecture
+The entry point is found in app/Main.hs. Main contains all the IO, in fact all
+side effects of twinpin are limited to Main only. Main communicates with
+src/Game.hs. Game is responsible for updating the game state given some user
+input. Below is the complete module dependency graph.
+
+![twinpin module dependencies](./module-dependencies.svg)
+
+Below Game in the graph are:
+* **Player**, which updates a player's state. A player is represented by a
+  circle visually. Given the trigger input a player will fire a shot.
+* **Shot**, which updates a shot's state. A shot is represented by a circle
+  visually.
+* **Circle**, which contains most of the physics. It updates a circle's position
+  given a velocity.
+* **Space**, which contains the basic data types and geometric functions.
+
+### How to generate graph
+The graph was generated with [graphmod](https://github.com/yav/graphmod).
+Install it with:
+```
+stack build --copy-compiler-tool graphmod
+```
+and generate module-dependencies.svg with:
+```
+stack exec graphmod | dot -Tsvg > module-dependencies.svg
+```
