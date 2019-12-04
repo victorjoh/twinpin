@@ -156,9 +156,8 @@ spec = do
             $          updateCollidingCirclePosition
                            (V2 0 (-4))
                            100
-                           (Obstacles
-                               (Bounds2D (0, 800) (0, 600))
-                               [Circle (V2 396 300) 1, Circle (V2 404 300) 1]
+                           (Obstacles (Bounds2D (0, 800) (0, 600))
+                                      [Circle (V2 396 300) 1, Circle (V2 404 300) 1]
                            )
                            (Circle (V2 398 306) 4)
             `shouldBe` (Circle (V2 400 303) 4)
@@ -207,9 +206,8 @@ spec = do
             $          updateCollidingCirclePosition
                            (V2 0 (-4))
                            100
-                           (Obstacles
-                               (Bounds2D (0, 800) (0, 600))
-                               [Circle (V2 396 300) 1, Circle (V2 404 300) 1]
+                           (Obstacles (Bounds2D (0, 800) (0, 600))
+                                      [Circle (V2 396 300) 1, Circle (V2 404 300) 1]
                            )
                            (Circle (V2 400 303) 4)
             `shouldBe` (Circle (V2 400 303) 4)
@@ -221,9 +219,8 @@ spec = do
             $          updateCollidingCirclePosition
                            (V2 (-4) 0)
                            1000
-                           (Obstacles
-                               (Bounds2D (0, 800) (0, 600))
-                               [Circle (V2 396 300) 1, Circle (V2 404 300) 1]
+                           (Obstacles (Bounds2D (0, 800) (0, 600))
+                                      [Circle (V2 396 300) 1, Circle (V2 404 300) 1]
                            )
                            (Circle (V2 400 303) 4)
             `shouldBe` (Circle (V2 4 305) 4)
@@ -252,3 +249,34 @@ spec = do
                            )
                            (Circle (V2 403 295) 4)
             `shouldBe` Circle (V2 405 300.76352) 4
+        it
+                (  "keeps the circle in position if it is pushing against"
+                ++ " two other circles (of different sizes)"
+                )
+            $          updateCollidingCirclePosition
+                           (V2 0.0 (-100))
+                           21
+                           (Obstacles
+                               (Bounds2D (0.0, 800.0) (0.0, 600.0))
+                               [ Circle (V2 144.0 144.0) 48.0
+                               , Circle (V2 53.0 144.0)  16.0
+                               ]
+                           )
+                           (Circle (V2 81.89259 157.61285) 16.0)
+            `shouldBe` Circle (V2 81.62088 158.31242) 16.0
+        it
+                (  "lets the circle slide off one of the circles when it is"
+                ++ " wedged between two other circles (of different sizes)"
+                ++ " given that the movement direction is right"
+                )
+            $          updateCollidingCirclePosition
+                           (V2 (-0.32768) 0)
+                           21
+                           (Obstacles
+                               (Bounds2D (0.0, 800.0) (0.0, 600.0))
+                               [ Circle (V2 144.0 144.0)        48.0
+                               , Circle (V2 65.06139 144.48865) 16.0
+                               ]
+                           )
+                           (Circle (V2 81.83336 171.7412) 16.0)
+            `shouldBe` Circle (V2 76.58978 174.33987) 16.0

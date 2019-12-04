@@ -25,17 +25,17 @@ type Radius = Float
 data Circle = Circle Position2D Radius deriving (Show, Eq)
 data Waypoint = Waypoint Position2D WaypointType
 data WaypointType = CircleCollision Circle | BoundsCollision | MovementFinished
-data Obstacles = Obstacles Bounds2D [Circle]
+data Obstacles = Obstacles Bounds2D [Circle] deriving (Show)
 
-class Movement m where
+class (Show m) => Movement m where
     getStart, getEnd :: m -> Position2D
     collideWithBounds :: Radius -> m -> Bounds2D -> Maybe Waypoint
     collideWithCircles :: Radius -> m -> [Circle] -> Maybe Waypoint
 -- start position and direction and end position and direction
 data CircularMovement = CircularMovement (Position2D, Vector2D)
                                          (Position2D, Vector2D)
-                                         Circle
-data StraightMovement = StraightMovement Position2D Position2D
+                                         Circle deriving (Show)
+data StraightMovement = StraightMovement Position2D Position2D deriving (Show)
 
 -- Converts to something that is easily drawable by SDL. Circle has coordinates 
 -- on the middle of the texture, whereas the SDL representation has the
@@ -124,8 +124,8 @@ moveAlongCircle radiusInMotion movement touchingCircle obstacles =
         start'               = start - touchingCirclePos
         endDirection         = (getEnd movement) - start
         endDirectionUnit     = toUnitVector endDirection
-        (V2 endDirectionUnitX endDirectionUnitY) = endDirectionUnit
-        (V2 startX'           startY'          ) = start'
+        V2 endDirectionUnitX endDirectionUnitY = endDirectionUnit
+        V2 startX'           startY'           = start'
         startDirection = flipToClosest (V2 (-startY') startX') endDirection
         escapePos'           = flipToClosest
             (centerTouchingR @* (V2 (-endDirectionUnitY) endDirectionUnitX))
@@ -322,9 +322,8 @@ instance Movement CircularMovement where
                   )
             $ map (increaseRadius radiusInMotion)
             $ filter
-                  ( not -- why negate? Does not make sense but it works...
-                  . hasAreaOnSide (getLine2D current' trajectoryCenter')
-                                  startDirection
+                  (hasAreaOnSide (getLine2D current' trajectoryCenter')
+                                 startDirection
                   )
                   obstacles'
       where
@@ -346,9 +345,9 @@ getClosestBoundsCollision reference p1 (Just p2) =
 
 hasAreaOnSide :: Line2D -> Vector2D -> Circle -> Bool
 hasAreaOnSide l side (Circle pos r) =
-    let l'         = offsetLine2D (-pos) l
-        closestPos = getPositionClosestToOrigin l'
-    in  closestPos `dot` side > 0 || norm closestPos <= r
+    let l'          = offsetLine2D (-pos) l
+        closestPos' = getPositionClosestToOrigin l'
+    in  pos `dot` side > 0 || norm closestPos' <= r
 
 -- The first circle is centered in origin. Converted from:
 -- https://cp-algorithms.com/geometry/circle-circle-intersection.html
