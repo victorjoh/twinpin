@@ -14,7 +14,7 @@ To set up SDL2 for Windows, follow step 1-4 in [this Reddit
 post](https://www.reddit.com/r/haskellgamedev/comments/4jpthu/windows_sdl2_is_now_almost_painless_via_stack/).
 
 ### Fedora specific setup
-install SDL2 with `sudo dnf install SDL2 SDL-devel`
+install SDL2 with `sudo dnf install SDL2 SDL2-devel`
 
 There is also some problem with the latest binutils release (26.fc31) causing
 build problems. I got the error: 
