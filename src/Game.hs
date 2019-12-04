@@ -12,91 +12,130 @@ import           Foreign.C.Types
 import           Data.Maybe                     ( mapMaybe
                                                 , maybeToList
                                                 )
-import           Data.Zip                       ( fsts )
 import           Data.List                      ( delete
                                                 , partition
                                                 )
-import           Data.Bifunctor                 ( first )
 
-data Game = Game Time ([Shot], [(Player, Barrel)]) Bool deriving Show
+-- The barrel contains shots that still haven't left the player after firing.
+-- These are separated from other shots to make sure that the player isn't
+-- immediately hit by his own shot after firing.
+data PlayerWithBarrel = PlayerWithBarrel Player [Shot] deriving Show
+data Movables = Movables [Shot] [PlayerWithBarrel] deriving Show
+type Pillar = Circle
+type IsFinished = Bool
+data Game = Game Time Movables [Pillar] IsFinished deriving Show
 
--- Shots that still haven't left the players barrel after firing. These are
--- separated from other shots to make sure that the player isn't immediately hit
--- by his own shot after firing.
-type Barrel = [Shot]
+createPillars :: Float -> Float -> [Pillar]
+createPillars boundsWidth boundsHeight =
+    let pillarRadius     = 48
+        distanceFromEdge = playerSide * 3 + pillarRadius
+    in  [ Circle (V2 x y) pillarRadius
+        | x <- [distanceFromEdge, boundsWidth - distanceFromEdge]
+        , y <- [distanceFromEdge, boundsHeight - distanceFromEdge]
+        ]
+
+pillarTextureFile :: FilePath
+pillarTextureFile = "gen/pillar.bmp"
 
 gameTextureFiles :: [FilePath]
-gameTextureFiles = playerTextureFile : shotTextureFiles
+gameTextureFiles = pillarTextureFile : playerTextureFile : shotTextureFiles
 
 createGame :: V2 CInt -> Game
-createGame (V2 bx by) = Game
+createGame bounds = Game
     0
-    ( []
-    , [ ((createPlayer (V2 xDistanceFromEdge yMiddle) 0 0), [])
-      , ( (createPlayer (V2 (fromIntegral bx - xDistanceFromEdge) yMiddle) 180 1
-          )
-        , []
-        )
-      ]
+    (Movables
+        []
+        [ PlayerWithBarrel (createPlayer (V2 xDistanceFromEdge yMiddle) 0 0) []
+        , PlayerWithBarrel
+            (createPlayer (V2 (boundsWidth - xDistanceFromEdge) yMiddle) 180 1)
+            []
+        ]
     )
+    (createPillars boundsWidth boundsHeight)
     False
   where
-    yMiddle           = (fromIntegral by / 2)
-    xDistanceFromEdge = playerSide + playerSide / 2
+    V2 boundsWidth boundsHeight = fromIntegral <$> bounds
+    yMiddle                     = boundsHeight / 2
+    xDistanceFromEdge           = playerSide + playerSide / 2
 
 toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
-toDrawableGame (Game _ (shots, playersWithBarrels) _) =
-    map (toDrawablePlayer . fst) playersWithBarrels
-        ++ map toDrawableShot (allShots playersWithBarrels shots)
+toDrawableGame (Game _ movables pillars _) =
+    let Movables _ playersWithBarrels = movables
+    in  map toDrawableShot (getAllShots movables)
+            ++ map (toDrawablePlayer . getPlayer) playersWithBarrels
+            ++ map (\c -> toDrawableCircle c 0 pillarTextureFile) pillars
 
-allShots :: [(Player, Barrel)] -> [Shot] -> [Shot]
-allShots playersWithBarrels shots = shots ++ concatMap snd playersWithBarrels
+getPlayer :: PlayerWithBarrel -> Player
+getPlayer (PlayerWithBarrel player _) = player
+
+getBarrel :: PlayerWithBarrel -> [Shot]
+getBarrel (PlayerWithBarrel _ barrel) = barrel
+
+mapPlayer :: (Player -> Player) -> PlayerWithBarrel -> PlayerWithBarrel
+mapPlayer f (PlayerWithBarrel player barrel) =
+    PlayerWithBarrel (f player) barrel
+
+mapBarrel :: ([Shot] -> [Shot]) -> PlayerWithBarrel -> PlayerWithBarrel
+mapBarrel f (PlayerWithBarrel player barrel) =
+    PlayerWithBarrel player $ f barrel
+
+getAllShots :: Movables -> [Shot]
+getAllShots (Movables shots playersWithBarrels) =
+    shots ++ concatMap getBarrel playersWithBarrels
+
+mapShots :: ([Shot] -> [Shot]) -> Movables -> Movables
+mapShots f (Movables shots playersWithBarrels) =
+    Movables (f shots) playersWithBarrels
 
 updateGame :: [Event] -> Word32 -> V2 CInt -> Game -> Game
-updateGame events newWordTime (V2 bx by) (Game time movingObjects isFinished) =
-    Game
-        newTime
-        ( filterOutOfBounds bounds
-        $ exitBarrels
-        $ registerHits
-        $ updateShots passedTime
-        $ triggerShots events
-        $ updatePlayers events passedTime bounds movingObjects
-        )
-        (isFinished || any isClosedEvent events)
+updateGame events newWordTime (V2 bx by) game = Game
+    newTime
+    ( removeOutOfBounds bounds
+    $ exitBarrels
+    $ registerHits
+    $ updateShots passedTime
+    $ triggerShots events
+    $ updatePlayers events passedTime bounds pillars
+    $ removePillarHits pillars movables
+    )
+    pillars
+    (isFinished || any isClosedEvent events)
   where
+    Game time movables pillars isFinished = game
     newTime    = fromIntegral newWordTime
     passedTime = newTime - time
     bounds     = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
 
-filterOutOfBounds
-    :: Bounds2D -> ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
-filterOutOfBounds bounds (shots, playersWithBarrels) =
-    (filter (isShotWithinBounds bounds) shots, playersWithBarrels)
+removePillarHits :: [Pillar] -> Movables -> Movables
+removePillarHits pillars = mapShots $ filter $ \shot ->
+    not $ any (areIntersecting (shotToCircle shot)) pillars
 
-exitBarrels :: ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
-exitBarrels (shots, playersWithBarrels) =
-    foldl exitBarrel (shots, []) playersWithBarrels
+removeOutOfBounds :: Bounds2D -> Movables -> Movables
+removeOutOfBounds bounds = mapShots (filter (isShotWithinBounds bounds))
 
-exitBarrel
-    :: ([Shot], [(Player, Barrel)])
-    -> (Player, Barrel)
-    -> ([Shot], [(Player, Barrel)])
-exitBarrel (shots, playersWithBarrels) (player, barrel) =
-    (shots ++ outsideBarrel, (player, insideBarrel) : playersWithBarrels)
+exitBarrels :: Movables -> Movables
+exitBarrels (Movables shots playersWithBarrels) =
+    foldl exitBarrel (Movables shots []) playersWithBarrels
+
+exitBarrel :: Movables -> PlayerWithBarrel -> Movables
+exitBarrel (Movables shots playersWithBarrels) (PlayerWithBarrel player barrel)
+    = Movables
+        (shots ++ outsideBarrel)
+        ((PlayerWithBarrel player insideBarrel) : playersWithBarrels)
   where
     (outsideBarrel, insideBarrel) = partition
         ((areIntersecting $ playerToCircle player) . shotToCircle)
         barrel
 
-registerHits :: ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
-registerHits (shots, playersWithBarrels) =
-    ( map (registerHit players) shots
-    , [ (player, map (registerHit $ delete player players) barrel)
-      | (player, barrel) <- playersWithBarrels
-      ]
-    )
-    where players = fsts playersWithBarrels
+registerHits :: Movables -> Movables
+registerHits (Movables shots playersWithBarrels) = Movables
+    (map (registerHit players) shots)
+    [ (PlayerWithBarrel player
+                        (map (registerHit $ delete player players) barrel)
+      )
+    | (PlayerWithBarrel player barrel) <- playersWithBarrels
+    ]
+    where players = map getPlayer playersWithBarrels
 
 registerHit :: [Player] -> Shot -> Shot
 registerHit players shot
@@ -105,80 +144,73 @@ registerHit players shot
     | otherwise
     = shot
 
-updateShots
-    :: DeltaTime -> ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
-updateShots dt (shots, playersWithBarrels) =
-    ( map (updateShot dt) shots
-    , mapSecond (map (updateShot dt)) playersWithBarrels
-    )
+updateShots :: DeltaTime -> Movables -> Movables
+updateShots dt (Movables shots playersWithBarrels) = Movables
+    (map (updateShot dt) shots)
+    (map (mapBarrel (map (updateShot dt))) playersWithBarrels)
 
-triggerShots
-    :: [Event] -> ([Shot], [(Player, Barrel)]) -> ([Shot], [(Player, Barrel)])
-triggerShots events (shots, playersWithBarrels) =
-    ( shots
-    , [ (player, barrel ++ maybeToList (triggerShot events player))
-      | (player, barrel) <- playersWithBarrels
-      ]
+triggerShots :: [Event] -> Movables -> Movables
+triggerShots events (Movables shots playersWithBarrels) = Movables shots $ map
+    (\(PlayerWithBarrel player barrel) ->
+        (PlayerWithBarrel
+            player
+            (barrel ++ maybeToList (triggerShot events player))
+        )
     )
+    playersWithBarrels
 
 updatePlayers
-    :: [Event]
-    -> DeltaTime
-    -> Bounds2D
-    -> ([Shot], [(Player, Barrel)])
-    -> ([Shot], [(Player, Barrel)])
-updatePlayers events dt bounds (shots, player : playersWithBarrels) =
-    (shots, updatePlayers' events dt bounds [] player playersWithBarrels)
+    :: [Event] -> DeltaTime -> Bounds2D -> [Pillar] -> Movables -> Movables
+updatePlayers _ _ _ _ (Movables shots []) = (Movables shots [])
+updatePlayers events dt bounds pillars movables =
+    let Movables shots (player : playersWithBarrels) = movables
+    in  Movables shots $ updatePlayers' events
+                                        dt
+                                        bounds
+                                        pillars
+                                        []
+                                        player
+                                        playersWithBarrels
 
 updatePlayers'
     :: [Event]
     -> DeltaTime
     -> Bounds2D
-    -> [(Player, Barrel)]
-    -> (Player, Barrel)
-    -> [(Player, Barrel)]
-    -> [(Player, Barrel)]
-updatePlayers' events dt bounds updated toBeUpdated [] =
-    updated
-        ++ [ (first
-                 (updatePlayer
-                     events
-                     dt
-                     (Obstacles bounds (map playerToCircle $ fsts updated))
-                 )
-                 toBeUpdated
-             )
-           ]
-updatePlayers' events dt bounds updated toBeUpdated (next : notUpdated) =
-    updatePlayers'
+    -> [Pillar]
+    -> [PlayerWithBarrel]
+    -> PlayerWithBarrel
+    -> [PlayerWithBarrel]
+    -> [PlayerWithBarrel]
+updatePlayers' events dt bounds pillars updated toBeUpdated [] =
+    (mapPlayer (updatePlayer events dt (toObstacles bounds pillars updated))
+               toBeUpdated
+        )
+        : updated
+updatePlayers' events dt bounds pillars updated toBeUpdated (next : notUpdated)
+    = updatePlayers'
         events
         dt
         bounds
-        (  updated
-        ++ [ (first
-                 (updatePlayer
-                     events
-                     dt
-                     (Obstacles
-                         bounds
-                         (map playerToCircle
-                              (fsts updated ++ fsts (next : notUpdated))
-                         )
-                     )
-                 )
-                 toBeUpdated
-             )
-           ]
+        pillars
+        ( (mapPlayer
+              (updatePlayer events dt (toObstacles bounds pillars otherPlayers))
+              toBeUpdated
+          )
+        : updated
         )
         next
         notUpdated
+    where otherPlayers = updated ++ (next : notUpdated)
 
-mapSecond :: (b -> c) -> [(a, b)] -> [(a, c)]
-mapSecond f xys = [ (x, f y) | (x, y) <- xys ]
+toObstacles :: Bounds2D -> [Pillar] -> [PlayerWithBarrel] -> Obstacles
+toObstacles bounds pillars playersWithBarrels =
+    Obstacles bounds
+        $  pillars
+        ++ map (playerToCircle . getPlayer) playersWithBarrels
 
 isClosedEvent :: Event -> Bool
 isClosedEvent (Event _ (WindowClosedEvent _)) = True
 isClosedEvent _                               = False
 
 isFinished :: Game -> Bool
-isFinished (Game _ _ isFinished) = isFinished
+isFinished (Game _ _ _ finished) = finished

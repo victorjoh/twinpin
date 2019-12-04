@@ -1,5 +1,6 @@
 module Circle
     ( Circle(..)
+    , Radius
     , toDrawableCircle
     , areIntersecting
     , isCircleWithinBounds

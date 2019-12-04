@@ -2,6 +2,10 @@ module GameSpec where
 
 import           Test.Hspec
 import           Game
+import           Player
+import           Circle
+import           Space
+import           Shot
 import           SDL.Vect
 import           SDL.Event
 import           SDL.Input.Joystick             ( JoyButtonState
@@ -13,6 +17,23 @@ import           Foreign.Ptr                    ( nullPtr )
 import           Foreign.C.Types
 import           SDL.Video.Renderer             ( Rectangle(..) )
 import           Data.Tuple.Extra               ( fst3 )
+import           SDL.Raw.Types                  ( JoystickID )
+
+moveRight :: JoystickID -> Event
+moveRight playerId = Event 0 (JoyAxisEvent (JoyAxisEventData playerId 0 20000))
+
+getFirstPlayer :: Game -> Player
+getFirstPlayer (Game _ (Movables _ ((PlayerWithBarrel player _) : _)) _ _) =
+    player
+
+getPlayerPosition :: Player -> Position2D
+getPlayerPosition player = let (Circle pos _) = playerToCircle player in pos
+
+playerRadius :: Radius
+playerRadius = playerSide / 2
+
+getShots :: Game -> [Shot]
+getShots (Game _ (Movables shots _) _ _) = shots
 
 spec :: Spec
 spec = do
@@ -22,21 +43,38 @@ spec = do
                 `shouldMatchList` [ "gen/shot.bmp"
                                   , "gen/shot-hit.bmp"
                                   , "gen/player.bmp"
+                                  , "gen/pillar.bmp"
                                   ]
 
     describe "toDrawableGame" $ do
         it "converts from game to something that can be drawn by SDL"
-            $               do
-                                toDrawableGame (createGame (V2 200 70))
-            `shouldContain` [ ( "gen/player.bmp"
-                              , Just (Rectangle (P (V2 32 19)) (V2 32 32))
-                              , 0
-                              )
-                            , ( "gen/player.bmp"
-                              , Just (Rectangle (P (V2 136 19)) (V2 32 32))
-                              , 180
-                              )
-                            ]
+            $                 do
+                                  toDrawableGame (createGame (V2 2000 700))
+            `shouldMatchList` [ ( "gen/player.bmp"
+                                , Just (Rectangle (P (V2 32 334)) (V2 32 32))
+                                , 0.0
+                                )
+                              , ( "gen/player.bmp"
+                                , Just (Rectangle (P (V2 1936 334)) (V2 32 32))
+                                , 180.0
+                                )
+                              , ( "gen/pillar.bmp"
+                                , Just (Rectangle (P (V2 96 96)) (V2 96 96))
+                                , 0.0
+                                )
+                              , ( "gen/pillar.bmp"
+                                , Just (Rectangle (P (V2 1808 96)) (V2 96 96))
+                                , 0.0
+                                )
+                              , ( "gen/pillar.bmp"
+                                , Just (Rectangle (P (V2 96 508)) (V2 96 96))
+                                , 0.0
+                                )
+                              , ( "gen/pillar.bmp"
+                                , Just (Rectangle (P (V2 1808 508)) (V2 96 96))
+                                , 0.0
+                                )
+                              ]
 
     describe "updateGame" $ do
         it "updates the player given the right event" $ do
@@ -181,7 +219,7 @@ spec = do
                 50
                 (V2 50 50)
                 (createGame (V2 50 50))
-        it "makes sure that two players collide" $ do
+        it "can collide two players" $ do
             toDrawableGame
                     (updateGame
                         [Event 0 (JoyAxisEvent (JoyAxisEventData 0 0 20000))]
@@ -194,3 +232,22 @@ spec = do
                                   , 0
                                   )
                                 ]
+        it "can collide a player with a pillar" $ do
+            playerId     <- return 0
+            player       <- return $ createPlayer (V2 100 300) 0 playerId
+            pillarRadius <- return 48
+            old <- return $ Game 0
+                                 (Movables [] [PlayerWithBarrel player []])
+                                 [Circle (V2 200 300) pillarRadius]
+                                 False
+            new <- return $ updateGame [(moveRight 0)] 1000 (V2 800 600) old
+            getPlayerPosition (getFirstPlayer new)
+                `shouldBe` (V2 (200 - pillarRadius - playerRadius) 300)
+        it "removes a shot that has hit a pillar" $ do
+            pillarRadius <- return 48
+            old <- return $ Game 0
+                                 (Movables [createShot (V2 200 300) 0] [])
+                                 [Circle (V2 200 300) pillarRadius]
+                                 False
+            new <- return $ updateGame [] 100 (V2 800 600) old
+            getShots new `shouldBe` []
