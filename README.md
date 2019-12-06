@@ -16,20 +16,6 @@ post](https://www.reddit.com/r/haskellgamedev/comments/4jpthu/windows_sdl2_is_no
 ### Fedora specific setup
 install SDL2 with `sudo dnf install SDL2 SDL2-devel`
 
-There is also some problem with the latest binutils release (26.fc31) causing
-build problems. I got the error: 
-```
-corrupt GNU build attribute note: wrong note type: bad value
-```
-
-I had to upgrade binutils to the rawhide release 29.fc31. See [this
-bug report](https://bugzilla.redhat.com/show_bug.cgi?id=1767937) for more
-information. This can be done with the following commands:
-```
-sudo dnf install fedora-repos-rawhide -y
-sudo dnf --disablerepo=* --enablerepo=rawhide --releasever=29 upgrade binutils --nogpgcheck
-```
-
 ## How to build and play
 `stack build` to build  
 `stack exec twinpin-exe` to play twinpin, or  
