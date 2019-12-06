@@ -93,8 +93,8 @@ updateGame events newWordTime (V2 bx by) game = Game
     ( removeOutOfBounds bounds
     $ exitBarrels
     $ registerHits
-    $ updateShots passedTime
     $ triggerShots events
+    $ updateShots passedTime
     $ updatePlayers events passedTime bounds pillars
     $ removePillarHits pillars movables
     )
@@ -123,7 +123,7 @@ exitBarrel (Movables shots playersWithBarrels) (PlayerWithBarrel player barrel)
         (shots ++ outsideBarrel)
         ((PlayerWithBarrel player insideBarrel) : playersWithBarrels)
   where
-    (outsideBarrel, insideBarrel) = partition
+    (insideBarrel, outsideBarrel) = partition
         ((areIntersecting $ playerToCircle player) . shotToCircle)
         barrel
 

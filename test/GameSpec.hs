@@ -102,11 +102,11 @@ spec = do
                               )
                         ]
                         50
-                        (V2 80 80)
-                        (createGame (V2 80 80))
+                        (V2 800 80)
+                        (createGame (V2 800 80))
                     )
                 `shouldContain` [ ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 78 35)) (V2 11 11))
+                                  , Just (Rectangle (P (V2 43 35)) (V2 11 11))
                                   , 0
                                   )
                                 ]
@@ -114,7 +114,7 @@ spec = do
             toDrawableGame
                     (updateGame
                         []
-                        50
+                        70
                         (V2 70 70)
                         (updateGame
                             [ Event
@@ -154,26 +154,31 @@ spec = do
                         )
                     )
                 `shouldContain` [ ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 78 45)) (V2 11 11))
+                                  , Just (Rectangle (P (V2 60 45)) (V2 11 11))
                                   , 0
                                   )
                                 , ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 43 62)) (V2 11 11))
+                                  , Just (Rectangle (P (V2 43 45)) (V2 11 11))
                                   , 0
                                   )
                                 ]
         it "changes color for shots that pass through target players" $ do
             toDrawableGame
                     (updateGame
-                        [ Event
-                              0
-                              (JoyButtonEvent
-                                  (JoyButtonEventData 0 5 JoyButtonPressed)
-                              )
-                        ]
-                        100
+                        []
+                        200
                         (V2 177 600)
-                        (createGame (V2 177 600))
+                        (updateGame
+                            [ Event
+                                  0
+                                  (JoyButtonEvent
+                                      (JoyButtonEventData 0 5 JoyButtonPressed)
+                                  )
+                            ]
+                            100
+                            (V2 177 600)
+                            (createGame (V2 177 600))
+                        )
                     )
                 `shouldContain` [ ( "gen/shot-hit.bmp"
                                   , Just (Rectangle (P (V2 113 295)) (V2 11 11))
@@ -188,15 +193,21 @@ spec = do
             $               do
                                 toDrawableGame
                                     (updateGame
-                                        [ Event
-                                              0
-                                              (JoyButtonEvent
-                                                  (JoyButtonEventData 0 5 JoyButtonPressed)
-                                              )
-                                        ]
-                                        23
+                                        []
+                                        46
                                         (V2 128 600)
-                                        (createGame (V2 128 600))
+                                        (updateGame
+                                            [ Event
+                                                  0
+                                                  (JoyButtonEvent
+                                                      (JoyButtonEventData 0 5 JoyButtonPressed
+                                                      )
+                                                  )
+                                            ]
+                                            23
+                                            (V2 128 600)
+                                            (createGame (V2 128 600))
+                                        )
                                     )
             `shouldContain` [ ( "gen/shot-hit.bmp"
                               , Just (Rectangle (P (V2 59 295)) (V2 11 11))
