@@ -15,6 +15,7 @@ import           Data.Maybe                     ( mapMaybe
 import           Data.List                      ( delete
                                                 , partition
                                                 )
+import           Data.Function                  ( (&) )
 
 -- The barrel contains shots that still haven't left the player after firing.
 -- These are separated from other shots to make sure that the player isn't
@@ -88,23 +89,24 @@ mapShots f (Movables shots playersWithBarrels) =
     Movables (f shots) playersWithBarrels
 
 updateGame :: [Event] -> Word32 -> V2 CInt -> Game -> Game
-updateGame events newWordTime (V2 bx by) game = Game
-    newTime
-    ( removeOutOfBounds bounds
-    $ exitBarrels
-    $ registerHits
-    $ triggerShots events
-    $ updateShots passedTime
-    $ updatePlayers events passedTime bounds pillars
-    $ removePillarHits pillars movables
-    )
-    pillars
-    (isFinished || any isClosedEvent events)
-  where
-    Game time movables pillars isFinished = game
-    newTime    = fromIntegral newWordTime
-    passedTime = newTime - time
-    bounds     = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
+updateGame events newWordTime (V2 bx by) game =
+    let Game time movables pillars isFinished = game
+        newTime    = fromIntegral newWordTime
+        passedTime = newTime - time
+        bounds     = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
+        newMovables =
+                movables
+                    & removePillarHits pillars
+                    & updatePlayers events passedTime bounds pillars
+                    & updateShots passedTime
+                    & triggerShots events
+                    & registerHits
+                    & exitBarrels
+                    & removeOutOfBounds bounds
+    in  Game newTime
+             newMovables
+             pillars
+             (isFinished || any isClosedEvent events)
 
 removePillarHits :: [Pillar] -> Movables -> Movables
 removePillarHits pillars = mapShots $ filter $ \shot ->

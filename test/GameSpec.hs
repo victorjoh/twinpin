@@ -243,22 +243,22 @@ spec = do
                                   , 0
                                   )
                                 ]
-        it "can collide a player with a pillar" $ do
-            playerId     <- return 0
-            player       <- return $ createPlayer (V2 100 300) 0 playerId
-            pillarRadius <- return 48
-            old <- return $ Game 0
-                                 (Movables [] [PlayerWithBarrel player []])
-                                 [Circle (V2 200 300) pillarRadius]
-                                 False
-            new <- return $ updateGame [(moveRight 0)] 1000 (V2 800 600) old
-            getPlayerPosition (getFirstPlayer new)
-                `shouldBe` (V2 (200 - pillarRadius - playerRadius) 300)
-        it "removes a shot that has hit a pillar" $ do
-            pillarRadius <- return 48
-            old <- return $ Game 0
-                                 (Movables [createShot (V2 200 300) 0] [])
-                                 [Circle (V2 200 300) pillarRadius]
-                                 False
-            new <- return $ updateGame [] 100 (V2 800 600) old
-            getShots new `shouldBe` []
+        it "can collide a player with a pillar"
+            $ let playerId     = 0
+                  player       = createPlayer (V2 100 300) 0 playerId
+                  pillarRadius = 48
+                  old          = Game 0
+                                      (Movables [] [PlayerWithBarrel player []])
+                                      [Circle (V2 200 300) pillarRadius]
+                                      False
+                  new = updateGame [(moveRight 0)] 1000 (V2 800 600) old
+              in  getPlayerPosition (getFirstPlayer new)
+                      `shouldBe` (V2 (200 - pillarRadius - playerRadius) 300)
+        it "removes a shot that has hit a pillar"
+            $ let pillarRadius = 48
+                  old          = Game 0
+                                      (Movables [createShot (V2 200 300) 0] [])
+                                      [Circle (V2 200 300) pillarRadius]
+                                      False
+                  new = updateGame [] 100 (V2 800 600) old
+              in  getShots new `shouldBe` []
