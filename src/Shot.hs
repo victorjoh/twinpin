@@ -1,6 +1,8 @@
 module Shot
-    ( Shot
+    ( Shot(..)
     , shotSpeed
+    , shotHitTextureFile
+    , shotDefaultTextureFile
     , shotTextureFiles
     , createShot
     , toDrawableShot
@@ -21,11 +23,14 @@ data Shot = Shot Circle Velocity2D FilePath deriving (Show, Eq)
 shotSpeed :: Speed
 shotSpeed = 0.7
 
-defaultTexture = "gen/shot.bmp"
-hitTexture = "gen/shot-hit.bmp"
+shotHitTextureFile :: FilePath
+shotHitTextureFile = "gen/shot-hit.bmp"
+
+shotDefaultTextureFile :: FilePath
+shotDefaultTextureFile = "gen/shot.bmp"
 
 shotTextureFiles :: [FilePath]
-shotTextureFiles = [defaultTexture, hitTexture]
+shotTextureFiles = [shotDefaultTextureFile, shotHitTextureFile]
 
 side :: Size1D
 side = 32 / 3
@@ -36,7 +41,7 @@ size = V2 side side
 createShot :: Position2D -> Angle2D -> Shot
 createShot position angle = Shot (Circle position (side / 2))
                                  (toVelocity angle shotSpeed)
-                                 defaultTexture
+                                 shotDefaultTextureFile
 
 toDrawableShot :: Shot -> (FilePath, Maybe (Rectangle CInt), CDouble)
 toDrawableShot (Shot cicle _ texture) = toDrawableCircle cicle 0 texture
@@ -53,4 +58,5 @@ shotToCircle :: Shot -> Circle
 shotToCircle (Shot circle _ _) = circle
 
 setShotHit :: Shot -> Shot
-setShotHit (Shot circle velocity texture) = Shot circle velocity hitTexture
+setShotHit (Shot circle velocity texture) =
+    Shot circle velocity shotHitTextureFile

@@ -23,8 +23,8 @@ import           Data.Function                  ( (&) )
 data PlayerWithBarrel = PlayerWithBarrel Player [Shot] deriving Show
 data Movables = Movables [Shot] [PlayerWithBarrel] deriving Show
 type Pillar = Circle
-type IsFinished = Bool
-data Game = Game Time Movables [Pillar] IsFinished deriving Show
+data State = Running | Finished deriving (Eq, Show)
+data Game = Game Time Movables Obstacles State deriving Show
 
 createPillars :: Float -> Float -> [Pillar]
 createPillars boundsWidth boundsHeight =
@@ -42,7 +42,7 @@ gameTextureFiles :: [FilePath]
 gameTextureFiles = pillarTextureFile : playerTextureFile : shotTextureFiles
 
 createGame :: V2 CInt -> Game
-createGame bounds = Game
+createGame boundsCInt = Game
     0
     (Movables
         []
@@ -52,15 +52,16 @@ createGame bounds = Game
             []
         ]
     )
-    (createPillars boundsWidth boundsHeight)
-    False
+    (Obstacles bounds $ createPillars boundsWidth boundsHeight)
+    Running
   where
-    V2 boundsWidth boundsHeight = fromIntegral <$> bounds
+    V2 boundsWidth boundsHeight = fromIntegral <$> boundsCInt
+    bounds                      = createBounds boundsWidth boundsHeight
     yMiddle                     = boundsHeight / 2
     xDistanceFromEdge           = playerSide + playerSide / 2
 
 toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
-toDrawableGame (Game _ movables pillars _) =
+toDrawableGame (Game _ movables (Obstacles _ pillars) _) =
     let Movables _ playersWithBarrels = movables
     in  map toDrawableShot (getAllShots movables)
             ++ map (toDrawablePlayer . getPlayer) playersWithBarrels
@@ -88,16 +89,20 @@ mapShots :: ([Shot] -> [Shot]) -> Movables -> Movables
 mapShots f (Movables shots playersWithBarrels) =
     Movables (f shots) playersWithBarrels
 
-updateGame :: [Event] -> Word32 -> V2 CInt -> Game -> Game
-updateGame events newWordTime (V2 bx by) game =
-    let Game time movables pillars isFinished = game
-        newTime    = fromIntegral newWordTime
-        passedTime = newTime - time
-        bounds     = Bounds2D (0, fromIntegral bx) (0, fromIntegral by)
+updateGame :: [Event] -> Word32 -> Game -> Game
+updateGame events newWordTime oldGame =
+    let Game oldTime oldMovables obstacles oldState = oldGame
+        Obstacles bounds pillars = obstacles
+        newTime                  = fromIntegral newWordTime
+        passedTime               = newTime - oldTime
         newMovables =
-                movables
+                oldMovables
+                    -- We remove shots that hit pillars where the shot are in
+                    -- their old state. This is because we want to be able to
+                    -- draw the frame where the shot hits the pillar, i.e. the
+                    -- frame produced by 'oldGame'.
                     & removePillarHits pillars
-                    & updatePlayers events passedTime bounds pillars
+                    & updatePlayers events passedTime obstacles
                     & updateShots passedTime
                     & triggerShots events
                     & registerHits
@@ -105,8 +110,8 @@ updateGame events newWordTime (V2 bx by) game =
                     & removeOutOfBounds bounds
     in  Game newTime
              newMovables
-             pillars
-             (isFinished || any isClosedEvent events)
+             obstacles
+             (if any isClosedEvent events then Finished else oldState)
 
 removePillarHits :: [Pillar] -> Movables -> Movables
 removePillarHits pillars = mapShots $ filter $ \shot ->
@@ -161,15 +166,13 @@ triggerShots events (Movables shots playersWithBarrels) = Movables shots $ map
     )
     playersWithBarrels
 
-updatePlayers
-    :: [Event] -> DeltaTime -> Bounds2D -> [Pillar] -> Movables -> Movables
-updatePlayers _ _ _ _ (Movables shots []) = (Movables shots [])
-updatePlayers events dt bounds pillars movables =
+updatePlayers :: [Event] -> DeltaTime -> Obstacles -> Movables -> Movables
+updatePlayers _ _ _ (Movables shots []) = (Movables shots [])
+updatePlayers events dt obstacles movables =
     let Movables shots (player : playersWithBarrels) = movables
     in  Movables shots $ updatePlayers' events
                                         dt
-                                        bounds
-                                        pillars
+                                        obstacles
                                         []
                                         player
                                         playersWithBarrels
@@ -177,25 +180,23 @@ updatePlayers events dt bounds pillars movables =
 updatePlayers'
     :: [Event]
     -> DeltaTime
-    -> Bounds2D
-    -> [Pillar]
+    -> Obstacles
     -> [PlayerWithBarrel]
     -> PlayerWithBarrel
     -> [PlayerWithBarrel]
     -> [PlayerWithBarrel]
-updatePlayers' events dt bounds pillars updated toBeUpdated [] =
-    (mapPlayer (updatePlayer events dt (toObstacles bounds pillars updated))
+updatePlayers' events dt obstacles updated toBeUpdated [] =
+    (mapPlayer (updatePlayer events dt (addToObstacles updated obstacles))
                toBeUpdated
         )
         : updated
-updatePlayers' events dt bounds pillars updated toBeUpdated (next : notUpdated)
-    = updatePlayers'
+updatePlayers' events dt obstacles updated toBeUpdated (next : notUpdated) =
+    updatePlayers'
         events
         dt
-        bounds
-        pillars
+        obstacles
         ( (mapPlayer
-              (updatePlayer events dt (toObstacles bounds pillars otherPlayers))
+              (updatePlayer events dt (addToObstacles otherPlayers obstacles))
               toBeUpdated
           )
         : updated
@@ -204,8 +205,8 @@ updatePlayers' events dt bounds pillars updated toBeUpdated (next : notUpdated)
         notUpdated
     where otherPlayers = updated ++ (next : notUpdated)
 
-toObstacles :: Bounds2D -> [Pillar] -> [PlayerWithBarrel] -> Obstacles
-toObstacles bounds pillars playersWithBarrels =
+addToObstacles :: [PlayerWithBarrel] -> Obstacles -> Obstacles
+addToObstacles playersWithBarrels (Obstacles bounds pillars) =
     Obstacles bounds
         $  pillars
         ++ map (playerToCircle . getPlayer) playersWithBarrels
@@ -215,4 +216,4 @@ isClosedEvent (Event _ (WindowClosedEvent _)) = True
 isClosedEvent _                               = False
 
 isFinished :: Game -> Bool
-isFinished (Game _ _ _ finished) = finished
+isFinished (Game _ _ _ state) = state == Finished

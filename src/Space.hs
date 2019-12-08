@@ -42,6 +42,9 @@ toPixelAngle = realToFrac
 updatePosition2D :: Position2D -> Velocity2D -> DeltaTime -> Position2D
 updatePosition2D position velocity dt = position + velocity * fromIntegral dt
 
+createBounds :: Size1D -> Size1D -> Bounds2D
+createBounds width height = Bounds2D (0, width) (0, height)
+
 boundsToLines2D :: Bounds2D -> [Line2D]
 boundsToLines2D (Bounds2D (xl, xu) (yl, yu)) =
     [(-1, 0, xl), (-1, 0, xu), (0, -1, yl), (0, -1, yu)]

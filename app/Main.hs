@@ -45,7 +45,7 @@ gameLoop renderer game textureMap = do
     threadDelay 20000
     events            <- pollEvents
     msSinceSdlLibInit <- ticks
-    let newGame = updateGame events msSinceSdlLibInit windowSize' game
+    let newGame = updateGame events msSinceSdlLibInit game
     rendererDrawColor renderer $= backgroundColor maxBound
     clear renderer
     mapM_ (draw renderer textureMap) $ toDrawableGame newGame

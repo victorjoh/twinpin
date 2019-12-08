@@ -18,16 +18,67 @@ import           Foreign.C.Types
 import           SDL.Video.Renderer             ( Rectangle(..) )
 import           Data.Tuple.Extra               ( fst3 )
 import           SDL.Raw.Types                  ( JoystickID )
+import           Debug.Trace                   as Debug
+import           GHC.Int
+import           Data.Word                      ( Word32 )
 
-moveRight :: JoystickID -> Event
-moveRight playerId = Event 0 (JoyAxisEvent (JoyAxisEventData playerId 0 20000))
+getRequiredStickPosition :: Vector1D -> Time -> Integer
+getRequiredStickPosition distance time =
+    round $ distance / (fromIntegral time * axisPositionToVelocity)
+
+-- returns how much time is needed for a shot to travel a certain distance
+getShotMovementTime :: Vector1D -> Word32
+getShotMovementTime distance = round $ distance / shotSpeed
+        -- actualDistance = time * shotSpeed in (time, actualDistance)
+
+createMoveRightEvent :: JoystickID -> Vector1D -> Word32 -> Event
+createMoveRightEvent playerId distance time =
+    let
+        stickPos = getRequiredStickPosition distance $ fromIntegral time
+        min      = minBound :: Int16
+        max      = maxBound :: Int16
+    in
+        if stickPos < toInteger min || stickPos > toInteger max
+            then error
+                (  "The required stick position "
+                ++ show stickPos
+                ++ " is not within the possible Int16 range of ["
+                ++ show min
+                ++ ", "
+                ++ show max
+                ++ "]. the stick position has to be provided in Int16 for"
+                ++ " JoyAxisEventData to accept it. Try using more time for the"
+                ++ " movement."
+                )
+            else Event
+                0
+                (JoyAxisEvent
+                    (JoyAxisEventData playerId 0 (fromInteger stickPos))
+                )
+
+createTriggerEvent :: JoystickID -> Event
+createTriggerEvent id =
+    Event 0 (JoyButtonEvent (JoyButtonEventData id 5 JoyButtonPressed))
+
+getFirstPlayerWithBarrel (Game _ (Movables _ (playerWithBarrel : _)) _ _) =
+    playerWithBarrel
 
 getFirstPlayer :: Game -> Player
-getFirstPlayer (Game _ (Movables _ ((PlayerWithBarrel player _) : _)) _ _) =
-    player
+getFirstPlayer game =
+    let PlayerWithBarrel player _ = getFirstPlayerWithBarrel game in player
+
+getFirstBarrel :: Game -> [Shot]
+getFirstBarrel game =
+    let PlayerWithBarrel _ barrel = getFirstPlayerWithBarrel game in barrel
+
+getCirclePosition :: Circle -> Position2D
+getCirclePosition (Circle position _) = position
 
 getPlayerPosition :: Player -> Position2D
-getPlayerPosition player = let (Circle pos _) = playerToCircle player in pos
+getPlayerPosition player = getCirclePosition $ playerToCircle player
+
+getShotPosition :: Shot -> Position2D
+getShotPosition shot = getCirclePosition $ shotToCircle shot
 
 playerRadius :: Radius
 playerRadius = playerSide / 2
@@ -35,230 +86,152 @@ playerRadius = playerSide / 2
 getShots :: Game -> [Shot]
 getShots (Game _ (Movables shots _) _ _) = shots
 
+getShotTexture (Shot _ _ texture) = texture
+
 spec :: Spec
 spec = do
-    describe "gameTextureFiles" $ do
-        it "retreives all the paths to texture files in the game" $ do
-            gameTextureFiles
-                `shouldMatchList` [ "gen/shot.bmp"
-                                  , "gen/shot-hit.bmp"
-                                  , "gen/player.bmp"
-                                  , "gen/pillar.bmp"
-                                  ]
+    describe "gameTextureFiles"
+        $ it "retreives all the paths to texture files in the game"
+        $ gameTextureFiles
+        `shouldMatchList` [ "gen/shot.bmp"
+                          , "gen/shot-hit.bmp"
+                          , "gen/player.bmp"
+                          , "gen/pillar.bmp"
+                          ]
 
-    describe "toDrawableGame" $ do
-        it "converts from game to something that can be drawn by SDL"
-            $                 do
-                                  toDrawableGame (createGame (V2 2000 700))
-            `shouldMatchList` [ ( "gen/player.bmp"
-                                , Just (Rectangle (P (V2 32 334)) (V2 32 32))
-                                , 0.0
-                                )
-                              , ( "gen/player.bmp"
-                                , Just (Rectangle (P (V2 1936 334)) (V2 32 32))
-                                , 180.0
-                                )
-                              , ( "gen/pillar.bmp"
-                                , Just (Rectangle (P (V2 96 96)) (V2 96 96))
-                                , 0.0
-                                )
-                              , ( "gen/pillar.bmp"
-                                , Just (Rectangle (P (V2 1808 96)) (V2 96 96))
-                                , 0.0
-                                )
-                              , ( "gen/pillar.bmp"
-                                , Just (Rectangle (P (V2 96 508)) (V2 96 96))
-                                , 0.0
-                                )
-                              , ( "gen/pillar.bmp"
-                                , Just (Rectangle (P (V2 1808 508)) (V2 96 96))
-                                , 0.0
-                                )
-                              ]
+    describe "toDrawableGame"
+        $ it "converts from game to something that can be drawn by SDL"
+        $ let player = PlayerWithBarrel (createPlayer (V2 48 350) 0 0) []
+              shot   = createShot (V2 100 200) 0
+              pillar = Circle (V2 60 70) 48
+              game   = Game 0
+                            (Movables [shot] [player])
+                            (Obstacles (createBounds 800 600) [pillar])
+                            Running
+              -- just test the order, the tests for the individual draw
+              -- functions test that the position and rotation is right
+          in  map fst3 (toDrawableGame game)
+                  `shouldBe` [ shotDefaultTextureFile
+                             , playerTextureFile
+                             , pillarTextureFile
+                             ]
 
     describe "updateGame" $ do
-        it "updates the player given the right event" $ do
-            toDrawableGame
-                    (updateGame
-                        [ Event 0 (JoyAxisEvent (JoyAxisEventData 0 0 10000))
-                        , Event 0 (JoyAxisEvent (JoyAxisEventData 0 1 20000))
-                        ]
-                        50
-                        (V2 200 100)
-                        (createGame (V2 200 100))
-                    )
-                `shouldContain` [ ( "gen/player.bmp"
-                                  , Just (Rectangle (P (V2 37 44)) (V2 32 32))
-                                  , 0
-                                  )
-                                ]
-        it "creates a shot given the right event" $ do
-            toDrawableGame
-                    (updateGame
-                        [ Event
-                              0
-                              (JoyButtonEvent
-                                  (JoyButtonEventData 0 5 JoyButtonPressed)
-                              )
-                        ]
-                        50
-                        (V2 800 80)
-                        (createGame (V2 800 80))
-                    )
-                `shouldContain` [ ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 43 35)) (V2 11 11))
-                                  , 0
-                                  )
-                                ]
-        it "removes a shot if it is out of bounds" $ do
-            toDrawableGame
-                    (updateGame
-                        []
-                        70
-                        (V2 70 70)
-                        (updateGame
-                            [ Event
-                                  0
-                                  (JoyButtonEvent
-                                      (JoyButtonEventData 0 5 JoyButtonPressed)
-                                  )
-                            ]
-                            25
-                            (V2 70 70)
-                            (createGame (V2 70 70))
-                        )
-                    )
-                `shouldNotSatisfy` any ((== "gen/shot.bmp") . fst3)
-        it "can handle multiple shots at the same time" $ do
-            toDrawableGame
-                    (updateGame
-                        [ Event 0 (JoyAxisEvent (JoyAxisEventData 0 4 10000))
-                        , Event
-                            0
-                            (JoyButtonEvent
-                                (JoyButtonEventData 0 5 JoyButtonPressed)
-                            )
-                        ]
-                        50
-                        (V2 200 100)
-                        (updateGame
-                            [ Event
-                                  0
-                                  (JoyButtonEvent
-                                      (JoyButtonEventData 0 5 JoyButtonPressed)
-                                  )
-                            ]
-                            25
-                            (V2 200 100)
-                            (createGame (V2 200 100))
-                        )
-                    )
-                `shouldContain` [ ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 60 45)) (V2 11 11))
-                                  , 0
-                                  )
-                                , ( "gen/shot.bmp"
-                                  , Just (Rectangle (P (V2 43 45)) (V2 11 11))
-                                  , 0
-                                  )
-                                ]
-        it "changes color for shots that pass through target players" $ do
-            toDrawableGame
-                    (updateGame
-                        []
-                        200
-                        (V2 177 600)
-                        (updateGame
-                            [ Event
-                                  0
-                                  (JoyButtonEvent
-                                      (JoyButtonEventData 0 5 JoyButtonPressed)
-                                  )
-                            ]
-                            100
-                            (V2 177 600)
-                            (createGame (V2 177 600))
-                        )
-                    )
-                `shouldContain` [ ( "gen/shot-hit.bmp"
-                                  , Just (Rectangle (P (V2 113 295)) (V2 11 11))
-                                  , 0.0
-                                  )
-                                ]
+        it "can move a player"
+            $ let player = PlayerWithBarrel (createPlayer (V2 48 350) 0 0) []
+                  old    = Game 0
+                                (Movables [] [player])
+                                (Obstacles (createBounds 800 600) [])
+                                Running
+                  newTime   = 200
+                  moveEvent = createMoveRightEvent 0 50 newTime
+                  new       = updateGame [moveEvent] newTime old
+              in  getPlayerPosition (getFirstPlayer new) `shouldBe` (V2 98 350)
+        it "can create a shot"
+            $ let
+                  position = V2 48 350
+                  angle    = 45
+                  player   = PlayerWithBarrel (createPlayer position angle 0) []
+                  old      = Game 0
+                                  (Movables [] [player])
+                                  (Obstacles (createBounds 800 600) [])
+                                  Running
+                  new = updateGame [createTriggerEvent 0] 100 old
+              in
+                  getFirstBarrel new `shouldBe` [createShot position angle]
+        it "can move a shot"
+            $ let
+                  shot = createShot (V2 400 300) 90
+                  old  = Game 0
+                              (Movables [shot] [])
+                              (Obstacles (createBounds 800 600) [])
+                              Running
+                  newTime   = getShotMovementTime 50
+                  new       = updateGame [] (getShotMovementTime 50) old
+                  -- expected y should be about 300 + 50 but calculate anyway
+                  -- since time is not a float
+                  expectedY = 300 + (fromIntegral newTime) * shotSpeed
+              in
+                  map getShotPosition (getShots new)
+                      `shouldBe` [V2 400 $ expectedY]
+        it "removes a shot if it is out of bounds"
+            $ let
+                  bounds = createBounds 800 600
+                  shot   = createShot (V2 750 300) 0
+                  old =
+                      Game 0 (Movables [shot] []) (Obstacles bounds []) Running
+                  newTime = getShotMovementTime 100
+              in
+                  getShots (updateGame [] newTime old) `shouldBe` []
+        it "changes color of shots that hit players"
+            $ let shot   = createShot (V2 100 300) 0
+                  player = PlayerWithBarrel (createPlayer (V2 200 300) 0 0) []
+                  old    = Game 0
+                                (Movables [shot] [player])
+                                (Obstacles (createBounds 800 600) [])
+                                Running
+                  new = updateGame [] (getShotMovementTime 100) old
+              in  map getShotTexture (getShots new)
+                      `shouldBe` [shotHitTextureFile]
         it
-                ("changes color for shots that pass through target players even"
-                ++ " though they haven't left the barrel of the player"
-                ++ " triggering the shot"
+                (  "changes color of shots that hit players even though they"
+                ++ " haven't left the barrel of the player triggering the shot"
                 )
-            $               do
-                                toDrawableGame
-                                    (updateGame
-                                        []
-                                        46
-                                        (V2 128 600)
-                                        (updateGame
-                                            [ Event
-                                                  0
-                                                  (JoyButtonEvent
-                                                      (JoyButtonEventData 0 5 JoyButtonPressed
-                                                      )
-                                                  )
-                                            ]
-                                            23
-                                            (V2 128 600)
-                                            (createGame (V2 128 600))
-                                        )
-                                    )
-            `shouldContain` [ ( "gen/shot-hit.bmp"
-                              , Just (Rectangle (P (V2 59 295)) (V2 11 11))
-                              , 0.0
-                              )
-                            ]
-        it "is not finished when the user has not closed the window" $ do
-            not $ isFinished $ updateGame []
-                                          50
-                                          (V2 50 50)
-                                          (createGame (V2 50 50))
-        it "is finished when the user closes the window" $ do
-            isFinished $ updateGame
-                [ Event
+            $ let
+                  shot = createShot (V2 400 300) 0
+                  sourcePlayer =
+                      PlayerWithBarrel (createPlayer (V2 400 300) 0 0) [shot]
+                  targetPlayer = PlayerWithBarrel
+                      (createPlayer (V2 (400 + playerSide) 300) 0 0)
+                      []
+                  old = Game 0
+                             (Movables [] [sourcePlayer, targetPlayer])
+                             (Obstacles (createBounds 800 600) [])
+                             Running
+                  new = updateGame [] (getShotMovementTime playerRadius) old
+              in
+                  map getShotTexture (getFirstBarrel new)
+                      `shouldBe` [shotHitTextureFile]
+        it "is not finished when the user has not closed the window"
+            $ not
+            $ isFinished
+            $ updateGame [] 50 (createGame (V2 800 600))
+        it "is finished when the user closes the window"
+            $ let closedEvent = Event
                       0
                       (WindowClosedEvent
                           (WindowClosedEventData (Window nullPtr))
                       )
-                ]
-                50
-                (V2 50 50)
-                (createGame (V2 50 50))
-        it "can collide two players" $ do
-            toDrawableGame
-                    (updateGame
-                        [Event 0 (JoyAxisEvent (JoyAxisEventData 0 0 20000))]
-                        1000
-                        (V2 200 100)
-                        (createGame (V2 200 100))
-                    )
-                `shouldContain` [ ( "gen/player.bmp"
-                                  , Just (Rectangle (P (V2 104 34)) (V2 32 32))
-                                  , 0
-                                  )
-                                ]
+              in  isFinished $ updateGame [closedEvent] 1 $ createGame $ V2 5 5
+        it "can collide two players"
+            $ let player1 = PlayerWithBarrel (createPlayer (V2 100 300) 0 0) []
+                  player2 = PlayerWithBarrel (createPlayer (V2 200 300) 0 1) []
+                  old     = Game 0
+                                 (Movables [] [player1, player2])
+                                 (Obstacles (createBounds 800 600) [])
+                                 Running
+                  newTime          = 1000
+                  movePlayer1Right = createMoveRightEvent 0 200 newTime
+                  new              = updateGame [movePlayer1Right] newTime old
+              in  getPlayerPosition (getFirstPlayer new)
+                      `shouldBe` (V2 (200 - playerSide) 300)
         it "can collide a player with a pillar"
-            $ let playerId     = 0
-                  player       = createPlayer (V2 100 300) 0 playerId
+            $ let player       = createPlayer (V2 100 300) 0 0
                   pillarRadius = 48
-                  old          = Game 0
-                                      (Movables [] [PlayerWithBarrel player []])
-                                      [Circle (V2 200 300) pillarRadius]
-                                      False
-                  new = updateGame [(moveRight 0)] 1000 (V2 800 600) old
+                  pillar       = Circle (V2 200 300) pillarRadius
+                  old = Game 0
+                             (Movables [] [PlayerWithBarrel player []])
+                             (Obstacles (createBounds 800 600) [pillar])
+                             Running
+                  new = updateGame [(createMoveRightEvent 0 200 1000)] 1000 old
               in  getPlayerPosition (getFirstPlayer new)
                       `shouldBe` (V2 (200 - pillarRadius - playerRadius) 300)
         it "removes a shot that has hit a pillar"
-            $ let pillarRadius = 48
-                  old          = Game 0
-                                      (Movables [createShot (V2 200 300) 0] [])
-                                      [Circle (V2 200 300) pillarRadius]
-                                      False
-                  new = updateGame [] 100 (V2 800 600) old
-              in  getShots new `shouldBe` []
+            $ let pillar = Circle (V2 200 300) 48
+                  old    = Game 0
+                                (Movables [createShot (V2 200 300) 0] [])
+                                -- use wide bounds to make sure the shot is not
+                                -- removed because it is outside the bounds
+                                (Obstacles (createBounds 100000 600) [pillar])
+                                Running
+              in  getShots (updateGame [] 1000 old) `shouldBe` []

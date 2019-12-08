@@ -5,6 +5,7 @@ module Player
     , playerTextureFile
     , createPlayer
     , toDrawablePlayer
+    , axisPositionToVelocity
     , updatePlayer
     , triggerShot
     , playerToCircle
@@ -38,7 +39,9 @@ data Player = Player Circle Velocity2D Aim2D JoystickID deriving (Show, Eq)
 playerSide :: Size1D
 playerSide = 32
 
+axisPositionToVelocity :: Float
 axisPositionToVelocity = 0.00001
+
 minAxisPosition = 5000
 rightBumberButtonId = 5
 
