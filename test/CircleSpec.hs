@@ -136,7 +136,7 @@ spec = do
                                       [Circle (V2 195.5 100) 1]
                            )
                            (Circle (V2 198 95) 2)
-            `shouldBe` (Circle (V2 198 95) 2)
+            `shouldBe` Circle (V2 198 95) 2
         it
                 (  "restricts position of the circle when colliding with a"
                 ++ " circle and then the bounds"

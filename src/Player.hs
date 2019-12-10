@@ -1,5 +1,6 @@
 module Player
-    ( Player
+    ( Player(..)
+    , Aim2D(..)
     , playerSide
     , playerSize
     , playerTextureFile
@@ -73,8 +74,8 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
         abs direction < minAxisPosition * axisPositionToVelocity
 
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
-updatePlayer events dt obstacles (Player circle velocity aim joystickId)
-    = Player newCircle newVelocity newAim joystickId
+updatePlayer events dt obstacles (Player circle velocity aim joystickId) =
+    Player newCircle newVelocity newAim joystickId
   where
     axisEvents =
         map (joyAxisEventAxis &&& joyAxisEventValue)
@@ -82,8 +83,7 @@ updatePlayer events dt obstacles (Player circle velocity aim joystickId)
             $ mapMaybe toJoyAxis events
     newVelocity = foldl updateVelocity velocity axisEvents
     newAim      = foldl updateAim aim axisEvents
-    newCircle =
-        updateCollidingCirclePosition newVelocity dt obstacles circle
+    newCircle   = updateCollidingCirclePosition newVelocity dt obstacles circle
 
 toJoyAxis :: Event -> Maybe JoyAxisEventData
 toJoyAxis (Event _ (JoyAxisEvent joyAxisEventData)) = Just joyAxisEventData

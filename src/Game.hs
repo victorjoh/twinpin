@@ -100,7 +100,7 @@ updateGame events newWordTime oldGame =
                     -- We remove shots that hit pillars where the shot are in
                     -- their old state. This is because we want to be able to
                     -- draw the frame where the shot hits the pillar, i.e. the
-                    -- frame produced by 'oldGame'.
+                    -- frame produced from 'oldGame'.
                     & removePillarHits pillars
                     & updatePlayers events passedTime obstacles
                     & updateShots passedTime
@@ -126,27 +126,24 @@ exitBarrels (Movables shots playersWithBarrels) =
 
 exitBarrel :: Movables -> PlayerWithBarrel -> Movables
 exitBarrel (Movables shots playersWithBarrels) (PlayerWithBarrel player barrel)
-    = Movables
-        (shots ++ outsideBarrel)
-        ((PlayerWithBarrel player insideBarrel) : playersWithBarrels)
+    = Movables (shots ++ outsideBarrel)
+               (PlayerWithBarrel player insideBarrel : playersWithBarrels)
   where
     (insideBarrel, outsideBarrel) = partition
-        ((areIntersecting $ playerToCircle player) . shotToCircle)
+        (areIntersecting (playerToCircle player) . shotToCircle)
         barrel
 
 registerHits :: Movables -> Movables
 registerHits (Movables shots playersWithBarrels) = Movables
     (map (registerHit players) shots)
-    [ (PlayerWithBarrel player
-                        (map (registerHit $ delete player players) barrel)
-      )
+    [ PlayerWithBarrel player (map (registerHit $ delete player players) barrel)
     | (PlayerWithBarrel player barrel) <- playersWithBarrels
     ]
     where players = map getPlayer playersWithBarrels
 
 registerHit :: [Player] -> Shot -> Shot
 registerHit players shot
-    | any ((areIntersecting $ shotToCircle shot) . playerToCircle) players
+    | any (areIntersecting (shotToCircle shot) . playerToCircle) players
     = setShotHit shot
     | otherwise
     = shot
@@ -158,16 +155,14 @@ updateShots dt (Movables shots playersWithBarrels) = Movables
 
 triggerShots :: [Event] -> Movables -> Movables
 triggerShots events (Movables shots playersWithBarrels) = Movables shots $ map
-    (\(PlayerWithBarrel player barrel) ->
-        (PlayerWithBarrel
-            player
-            (barrel ++ maybeToList (triggerShot events player))
-        )
+    (\(PlayerWithBarrel player barrel) -> PlayerWithBarrel
+        player
+        (barrel ++ maybeToList (triggerShot events player))
     )
     playersWithBarrels
 
 updatePlayers :: [Event] -> DeltaTime -> Obstacles -> Movables -> Movables
-updatePlayers _ _ _ (Movables shots []) = (Movables shots [])
+updatePlayers _ _ _ (Movables shots []) = Movables shots []
 updatePlayers events dt obstacles movables =
     let Movables shots (player : playersWithBarrels) = movables
     in  Movables shots $ updatePlayers' events
@@ -186,19 +181,18 @@ updatePlayers'
     -> [PlayerWithBarrel]
     -> [PlayerWithBarrel]
 updatePlayers' events dt obstacles updated toBeUpdated [] =
-    (mapPlayer (updatePlayer events dt (addToObstacles updated obstacles))
-               toBeUpdated
-        )
+    mapPlayer (updatePlayer events dt (addToObstacles updated obstacles))
+              toBeUpdated
         : updated
 updatePlayers' events dt obstacles updated toBeUpdated (next : notUpdated) =
     updatePlayers'
         events
         dt
         obstacles
-        ( (mapPlayer
-              (updatePlayer events dt (addToObstacles otherPlayers obstacles))
-              toBeUpdated
-          )
+        ( mapPlayer
+                (updatePlayer events dt (addToObstacles otherPlayers obstacles))
+                toBeUpdated
+
         : updated
         )
         next

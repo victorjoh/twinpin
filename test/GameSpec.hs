@@ -3,62 +3,25 @@ module GameSpec where
 import           Test.Hspec
 import           Game
 import           Player
+import           PlayerUtil
 import           Circle
+import           CircleUtil
 import           Space
 import           Shot
+import           ShotUtil
 import           SDL.Vect
 import           SDL.Event
-import           SDL.Input.Joystick             ( JoyButtonState
-                                                    ( JoyButtonPressed
-                                                    )
-                                                )
 import           SDL.Internal.Types             ( Window(..) )
 import           Foreign.Ptr                    ( nullPtr )
 import           Foreign.C.Types
-import           SDL.Video.Renderer             ( Rectangle(..) )
 import           Data.Tuple.Extra               ( fst3 )
-import           SDL.Raw.Types                  ( JoystickID )
-import           Debug.Trace                   as Debug
 import           GHC.Int
 import           Data.Word                      ( Word32 )
-
-getRequiredStickPosition :: Vector1D -> Time -> Integer
-getRequiredStickPosition distance time =
-    round $ distance / (fromIntegral time * axisPositionToVelocity)
 
 -- returns how much time is needed for a shot to travel a certain distance
 getShotMovementTime :: Vector1D -> Word32
 getShotMovementTime distance = round $ distance / shotSpeed
         -- actualDistance = time * shotSpeed in (time, actualDistance)
-
-createMoveRightEvent :: JoystickID -> Vector1D -> Word32 -> Event
-createMoveRightEvent playerId distance time =
-    let
-        stickPos = getRequiredStickPosition distance $ fromIntegral time
-        min      = minBound :: Int16
-        max      = maxBound :: Int16
-    in
-        if stickPos < toInteger min || stickPos > toInteger max
-            then error
-                (  "The required stick position "
-                ++ show stickPos
-                ++ " is not within the possible Int16 range of ["
-                ++ show min
-                ++ ", "
-                ++ show max
-                ++ "]. the stick position has to be provided in Int16 for"
-                ++ " JoyAxisEventData to accept it. Try using more time for the"
-                ++ " movement."
-                )
-            else Event
-                0
-                (JoyAxisEvent
-                    (JoyAxisEventData playerId 0 (fromInteger stickPos))
-                )
-
-createTriggerEvent :: JoystickID -> Event
-createTriggerEvent id =
-    Event 0 (JoyButtonEvent (JoyButtonEventData id 5 JoyButtonPressed))
 
 getFirstPlayerWithBarrel (Game _ (Movables _ (playerWithBarrel : _)) _ _) =
     playerWithBarrel
@@ -71,21 +34,10 @@ getFirstBarrel :: Game -> [Shot]
 getFirstBarrel game =
     let PlayerWithBarrel _ barrel = getFirstPlayerWithBarrel game in barrel
 
-getCirclePosition :: Circle -> Position2D
-getCirclePosition (Circle position _) = position
-
-getPlayerPosition :: Player -> Position2D
-getPlayerPosition player = getCirclePosition $ playerToCircle player
-
-getShotPosition :: Shot -> Position2D
-getShotPosition shot = getCirclePosition $ shotToCircle shot
-
-playerRadius :: Radius
-playerRadius = playerSide / 2
-
 getShots :: Game -> [Shot]
 getShots (Game _ (Movables shots _) _ _) = shots
 
+getShotTexture :: Shot -> FilePath
 getShotTexture (Shot _ _ texture) = texture
 
 spec :: Spec
