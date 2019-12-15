@@ -12,7 +12,7 @@ spec = do
     describe "toDrawableShot"
         $          it "converts from shot to something that can be drawn by SDL"
         $          toDrawableShot (createShot (V2 30.4 49.8) 45)
-        `shouldBe` ( "gen/shot.bmp"
+        `shouldBe` ( "textures/shot.bmp"
                    , Just (Rectangle (P (V2 25 44)) (V2 11 11))
                    , 0
                    )

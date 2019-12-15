@@ -28,7 +28,7 @@ data Waypoint = Waypoint Position2D WaypointType
 data WaypointType = CircleCollision Circle | BoundsCollision | MovementFinished
 data Obstacles = Obstacles Bounds2D [Circle] deriving (Show)
 
-class (Show m) => Movement m where
+class Show m => Movement m where
     getStart, getEnd :: m -> Position2D
     collideWithBounds :: Radius -> m -> Bounds2D -> Maybe Waypoint
     collideWithCircles :: Radius -> m -> [Circle] -> Maybe Waypoint
@@ -49,12 +49,11 @@ toDrawableCircle
 toDrawableCircle (Circle position radius) angle textureFile =
     ( textureFile
     , Just
-        (Rectangle (toPixelPoint (position - (V2 radius radius)))
+        (Rectangle (toPixelPoint (position - V2 radius radius))
                    (toPixelSize $ boundingBoxSize radius)
         )
     , toPixelAngle angle
     )
-    where radius' = (V2 radius radius)
 
 boundingBoxSize :: Radius -> V2 Float
 boundingBoxSize radius = V2 diameter diameter where diameter = radius * 2
@@ -66,7 +65,6 @@ areIntersecting (Circle (V2 x1 y1) r1) (Circle (V2 x2 y2) r2) =
 isCircleWithinBounds :: Bounds2D -> Circle -> Bool
 isCircleWithinBounds bounds (Circle position radius) =
     isWithinBounds2D position $ increaseBounds2D bounds $ boundingBoxSize radius
-    where diameter = radius * 2
 
 updateCirclePosition :: Velocity2D -> DeltaTime -> Circle -> Circle
 updateCirclePosition velocity dt (Circle oldPosition radius) =
@@ -106,7 +104,7 @@ moveFromWaypoint radiusInMotion waypoint end obstacles = case waypointType of
 moveAlongBounds :: Radius -> StraightMovement -> Obstacles -> Position2D
 moveAlongBounds radiusInMotion movement (Obstacles bounds circles) =
     let centerBounds = decreaseBounds2D bounds $ boundingBoxSize radiusInMotion
-        newEnd       = (limitPosition2D (getEnd movement) centerBounds)
+        newEnd       = limitPosition2D (getEnd movement) centerBounds
     in  maybe
             newEnd
             (\(Waypoint position _) -> position)
@@ -123,13 +121,13 @@ moveAlongCircle radiusInMotion movement touchingCircle obstacles =
         centerTouchingCircle = increaseRadius radiusInMotion touchingCircle
         (Circle touchingCirclePos centerTouchingR) = centerTouchingCircle
         start'               = start - touchingCirclePos
-        endDirection         = (getEnd movement) - start
+        endDirection         = getEnd movement - start
         endDirectionUnit     = toUnitVector endDirection
         V2 endDirectionUnitX endDirectionUnitY = endDirectionUnit
         V2 startX'           startY'           = start'
         startDirection = flipToClosest (V2 (-startY') startX') endDirection
         escapePos'           = flipToClosest
-            (centerTouchingR @* (V2 (-endDirectionUnitY) endDirectionUnitX))
+            (centerTouchingR @* V2 (-endDirectionUnitY) endDirectionUnitX)
             startDirection
         possibleDistanceOnCircle = scalarProjection endDirection startDirection
         possibleAngleDistance    = possibleDistanceOnCircle / centerTouchingR
@@ -160,8 +158,8 @@ moveAlongCircle radiusInMotion movement touchingCircle obstacles =
                 else movePastCircle
                     radiusInMotion
                     (CircularMovement
-                        (start                           , startDirection)
-                        ((escapePos' + touchingCirclePos), endDirection)
+                        (start                         , startDirection)
+                        (escapePos' + touchingCirclePos, endDirection)
                         centerTouchingCircle
                     )
                     touchingCircle
@@ -194,8 +192,8 @@ movePastCircle
     -> Position2D
 movePastCircle radiusInMotion movement touchedCircle end obstacles =
     let
-        (Obstacles bounds circles)             = obstacles
-        nonTouchedCircles                      = (delete touchedCircle circles)
+        Obstacles bounds circles               = obstacles
+        nonTouchedCircles                      = delete touchedCircle circles
         CircularMovement _ (exit, _) _         = movement
         Waypoint waypointPosition waypointType = getNextWaypoint
             radiusInMotion
@@ -213,7 +211,7 @@ movePastCircle radiusInMotion movement touchedCircle end obstacles =
                 (Obstacles bounds circles)
             _ -> waypointPosition
 
-getNextWaypoint :: (Movement m) => Radius -> m -> Obstacles -> Waypoint
+getNextWaypoint :: Movement m => Radius -> m -> Obstacles -> Waypoint
 getNextWaypoint radiusInMotion movement (Obstacles bounds circles) = foldr
     (getClosestWaypoint (getStart movement))
     (Waypoint (getEnd movement) MovementFinished)
@@ -336,7 +334,7 @@ instance Movement CircularMovement where
         target'           = endPosition - trajectoryCenter
         (-@) (Circle pos r) offset = Circle (pos - offset) r
         (+@) (Circle pos r) offset = Circle (pos + offset) r
-        obstacles' = map (flip (-@) trajectoryCenter) obstacles
+        obstacles' = map (-@ trajectoryCenter) obstacles
 
 getClosestBoundsCollision
     :: Position2D -> Position2D -> Maybe Position2D -> Maybe Position2D
@@ -366,9 +364,9 @@ getCircleLineIntersections :: Radius -> Line2D -> [Position2D]
 getCircleLineIntersections r line =
     let (a, b, c)  = line
         (V2 x0 y0) = getPositionClosestToOrigin line
-    in  if (c * c > r * r * (a * a + b * b) + epsilon)
+    in  if c * c > r * r * (a * a + b * b) + epsilon
             then []
-            else if (abs (c * c - r * r * (a * a + b * b)) < epsilon)
+            else if abs (c * c - r * r * (a * a + b * b)) < epsilon
                 then [V2 x0 y0]
                 else
                     let d    = r * r - c * c / (a * a + b * b)

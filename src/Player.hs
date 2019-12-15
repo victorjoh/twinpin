@@ -50,7 +50,7 @@ playerSize :: Size2D
 playerSize = V2 playerSide playerSide
 
 playerTextureFile :: FilePath
-playerTextureFile = "gen/player.bmp"
+playerTextureFile = "textures/player.bmp"
 
 createPlayer :: Position2D -> Angle2D -> JoystickID -> Player
 createPlayer pos angle =

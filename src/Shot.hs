@@ -24,10 +24,10 @@ shotSpeed :: Speed
 shotSpeed = 0.7
 
 shotHitTextureFile :: FilePath
-shotHitTextureFile = "gen/shot-hit.bmp"
+shotHitTextureFile = "textures/shot-hit.bmp"
 
 shotDefaultTextureFile :: FilePath
-shotDefaultTextureFile = "gen/shot.bmp"
+shotDefaultTextureFile = "textures/shot.bmp"
 
 shotTextureFiles :: [FilePath]
 shotTextureFiles = [shotDefaultTextureFile, shotHitTextureFile]

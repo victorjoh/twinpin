@@ -45,10 +45,10 @@ spec = do
     describe "gameTextureFiles"
         $ it "retreives all the paths to texture files in the game"
         $ gameTextureFiles
-        `shouldMatchList` [ "gen/shot.bmp"
-                          , "gen/shot-hit.bmp"
-                          , "gen/player.bmp"
-                          , "gen/pillar.bmp"
+        `shouldMatchList` [ "textures/shot.bmp"
+                          , "textures/shot-hit.bmp"
+                          , "textures/player.bmp"
+                          , "textures/pillar.bmp"
                           ]
 
     describe "toDrawableGame"

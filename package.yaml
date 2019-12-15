@@ -1,5 +1,5 @@
 name:                twinpin
-version:             0.1.0.0
+version:             0.1.0
 github:              "victorjoh/twinpin"
 license:             BSD3
 author:              "Victor Johnsson"
@@ -11,8 +11,8 @@ extra-source-files:
 - CHANGELOG.md
 
 # Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            game
+synopsis:            A minimal twin-stick shooter
+category:            game
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
@@ -27,12 +27,16 @@ custom-setup:
   - base >= 4.12 && < 5
   - Cabal >= 2.4
   - JuicyPixels
+  - FontyFruity
   - svg-tree
   - rasterific-svg
   - system-filepath
   - directory
+  - process
+  - filepath
+  - MissingH
 
-data-files: gen/*.bmp
+data-files: textures/*.bmp
 
 library:
   source-dirs: src

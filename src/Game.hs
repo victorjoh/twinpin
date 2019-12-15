@@ -36,7 +36,7 @@ createPillars boundsWidth boundsHeight =
         ]
 
 pillarTextureFile :: FilePath
-pillarTextureFile = "gen/pillar.bmp"
+pillarTextureFile = "textures/pillar.bmp"
 
 gameTextureFiles :: [FilePath]
 gameTextureFiles = pillarTextureFile : playerTextureFile : shotTextureFiles

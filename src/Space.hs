@@ -131,7 +131,7 @@ getLine2D (V2 x1 y1) (V2 x2 y2) = (y1 - y2, x2 - x1, x1 * y2 - x2 * y1)
 (@*) m = fmap (m *)
 
 (/@) :: Fractional a => V2 a -> a -> V2 a
-(/@) v m = fmap (\a -> a / m) v
+(/@) v m = fmap (/ m) v
 
 epsilon :: Float
 epsilon = 1.19209290e-07
@@ -139,9 +139,7 @@ epsilon = 1.19209290e-07
 angleDifference2D :: Angle2D -> Angle2D -> Angle2D
 angleDifference2D a b =
     let diff = a - b
-    in  diff + if (diff > pi)
-            then -2 * pi
-            else if (diff < -pi) then 2 * pi else 0
+    in  diff + if diff > pi then -2 * pi else if diff < -pi then 2 * pi else 0
 
 vectorToAngle :: Vector2D -> Angle2D
 vectorToAngle (V2 x y) = atan2 y x

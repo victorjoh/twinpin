@@ -19,7 +19,7 @@ spec = do
     describe "toDrawablePlayer"
         $ it "converts from player to something that can be drawn by SDL"
         $ toDrawablePlayer (createPlayer (V2 40 50) 30 0)
-        `shouldBe` ( "gen/player.bmp"
+        `shouldBe` ( "textures/player.bmp"
                    , Just (Rectangle (P (V2 24 34)) (V2 32 32))
                    , 30
                    )

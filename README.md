@@ -20,7 +20,9 @@ install SDL2 with `sudo dnf install SDL2 SDL2-devel`
 `stack build` to build  
 `stack exec twinpin-exe` to play twinpin, or  
 `stack run` to both build and execute  
-`stack test` to run the tests
+`stack test` to run the tests  
+`stack deploy.hs` to make a twinpin distribuion for the current operating system
+and processor architecture
 
 ## Suggested development environment
 To develop twinpin, I use Visual Studio Code with the following extensions:
@@ -56,11 +58,11 @@ The textures found in [images](images) are edited with [Inkscape](https://inksca
 
 ## twinpin code architecture
 The entry point is found in [Main]. [Main] contains all the IO, in fact all side
-effects of twinpin are limited to [Main] only. [Main] communicates with [Game].
-[Game] is responsible for updating the game state given some user input. Below
-is the complete module dependency graph.
+effects of twinpin are limited to [Main] only. [Main] communicates with [Game],
+which is responsible for updating the game state given some user input. Below is
+the complete module dependency graph.
 
-![twinpin module dependencies](./module-dependencies.svg)
+![twinpin module dependencies](images/module-dependencies.svg)
 
 Below [Game] in the graph are:
 * [Player], which updates a player's state. A player is represented by a circle
@@ -79,7 +81,7 @@ stack build --copy-compiler-tool graphmod
 ```
 and generate module-dependencies.svg with:
 ```
-stack exec graphmod | dot -Tsvg > module-dependencies.svg
+stack exec graphmod | dot -Tsvg > images/module-dependencies.svg
 ```
 
 [Main]:   app/Main.hs
