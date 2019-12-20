@@ -3,7 +3,10 @@
 
 twinpin is a minimal twin-stick shooter. The two players control their
 characters with gamepads. So far I have only tried it with a Sony DualShock 4
-V2. I develop this game to satisfy my functional programming itch.
+V2. I develop this game to satisfy my functional programming itch. To play,
+either download [the latest
+release](https://github.com/victorjoh/twinpin/releases/latest), or build from
+source by following the instructions below.
 
 ## Build dependencies
 Stack is used to build the project. Stack will download most of the other build
