@@ -15,6 +15,7 @@ import           Control.Monad
 
 backgroundColor = V4 34 11 21
 windowSize' = V2 800 600
+frameInterval = 16667
 
 main :: IO ()
 main = do
@@ -42,14 +43,15 @@ appendTexture renderer textureMap textureFile = do
 
 gameLoop :: Renderer -> Game -> Map.Map FilePath Texture -> IO ()
 gameLoop renderer game textureMap = do
-    threadDelay 20000
-    events            <- pollEvents
-    msSinceSdlLibInit <- ticks
-    let newGame = updateGame events msSinceSdlLibInit game
+    currentTime <- fromIntegral <$> ticks
+    events      <- pollEvents
+    let newGame = updateGame events currentTime game
     rendererDrawColor renderer $= backgroundColor maxBound
     clear renderer
     mapM_ (draw renderer textureMap) $ toDrawableGame newGame
     present renderer
+    timeSpent <- fmap (flip (-) currentTime . fromIntegral) ticks
+    threadDelay $ frameInterval - timeSpent
     unless (isFinished newGame) (gameLoop renderer newGame textureMap)
 
 draw

@@ -4,6 +4,7 @@ import           SDL.Vect
 import           Foreign.C.Types
 import           Data.Tuple.Extra               ( both )
 
+-- microseconds since library initialization
 type Time = Int
 type DeltaTime = Time
 

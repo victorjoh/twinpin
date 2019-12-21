@@ -6,7 +6,6 @@ import           Space
 import           Circle
 import           SDL
 import           Data.Word                      ( Word8
-                                                , Word32
                                                 )
 import           Foreign.C.Types
 import           Data.Maybe                     ( mapMaybe
@@ -89,11 +88,10 @@ mapShots :: ([Shot] -> [Shot]) -> Movables -> Movables
 mapShots f (Movables shots playersWithBarrels) =
     Movables (f shots) playersWithBarrels
 
-updateGame :: [Event] -> Word32 -> Game -> Game
-updateGame events newWordTime oldGame =
+updateGame :: [Event] -> Time -> Game -> Game
+updateGame events newTime oldGame =
     let Game oldTime oldMovables obstacles oldState = oldGame
         Obstacles bounds pillars = obstacles
-        newTime                  = fromIntegral newWordTime
         passedTime               = newTime - oldTime
         newMovables =
                 oldMovables

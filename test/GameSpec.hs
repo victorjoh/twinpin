@@ -16,10 +16,9 @@ import           Foreign.Ptr                    ( nullPtr )
 import           Foreign.C.Types
 import           Data.Tuple.Extra               ( fst3 )
 import           GHC.Int
-import           Data.Word                      ( Word32 )
 
 -- returns how much time is needed for a shot to travel a certain distance
-getShotMovementTime :: Vector1D -> Word32
+getShotMovementTime :: Vector1D -> Time
 getShotMovementTime distance = round $ distance / shotSpeed
         -- actualDistance = time * shotSpeed in (time, actualDistance)
 
@@ -76,7 +75,7 @@ spec = do
                                 (Obstacles (createBounds 800 600) [])
                                 Running
                   newTime   = 200
-                  moveEvent = createMoveRightEvent 0 50 newTime
+                  moveEvent = createMoveRightEvent 0 50 (fromIntegral newTime)
                   new       = updateGame [moveEvent] newTime old
               in  getPlayerPosition (getFirstPlayer new) `shouldBe` (V2 98 350)
         it "can create a shot"
@@ -156,16 +155,19 @@ spec = do
                       )
               in  isFinished $ updateGame [closedEvent] 1 $ createGame $ V2 5 5
         it "can collide two players"
-            $ let player1 = PlayerWithBarrel (createPlayer (V2 100 300) 0 0) []
+            $ let
+                  player1 = PlayerWithBarrel (createPlayer (V2 100 300) 0 0) []
                   player2 = PlayerWithBarrel (createPlayer (V2 200 300) 0 1) []
                   old     = Game 0
                                  (Movables [] [player1, player2])
                                  (Obstacles (createBounds 800 600) [])
                                  Running
-                  newTime          = 1000
-                  movePlayer1Right = createMoveRightEvent 0 200 newTime
-                  new              = updateGame [movePlayer1Right] newTime old
-              in  getPlayerPosition (getFirstPlayer new)
+                  newTime = 1000
+                  movePlayer1Right =
+                      createMoveRightEvent 0 200 (fromIntegral newTime)
+                  new = updateGame [movePlayer1Right] newTime old
+              in
+                  getPlayerPosition (getFirstPlayer new)
                       `shouldBe` (V2 (200 - playerSide) 300)
         it "can collide a player with a pillar"
             $ let player       = createPlayer (V2 100 300) 0 0
