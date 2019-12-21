@@ -29,7 +29,7 @@ import           Data.List.Split                ( splitOn )
 import           Data.List                      ( find )
 import           Data.Bifoldable                ( biconcat )
 
-twinpinVersion = "0.1.0"
+twinpinVersion = "0.1.1"
 texturesDir = "textures"
 licenseFile = "LICENSE"
 buildExeName = "twinpin-exe"
