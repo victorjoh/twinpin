@@ -17,6 +17,12 @@ import           Space
 import           Shot
 import           Circle
 import           SDL
+import           Graphics.Rasterific     hiding ( V2(..) )
+import qualified Graphics.Rasterific           as Rasterific
+                                                ( V2(..) )
+import           Graphics.Rasterific.Texture
+import           Graphics.Rasterific.Transformations
+import           Codec.Picture.Types
 import           Data.Word                      ( Word8
                                                 , Word32
                                                 )
@@ -45,6 +51,8 @@ axisPositionToVelocity = 0.00001
 
 minAxisPosition = 5000
 rightBumberButtonId = 5
+baseColor = PixelRGBA8 0xE6 0xE6 0xE6 255
+aimColor = PixelRGBA8 0xD3 0x5F 0x5F 255
 
 playerSize :: Size2D
 playerSize = V2 playerSide playerSide
@@ -56,14 +64,26 @@ createPlayer :: Position2D -> Angle2D -> JoystickID -> Player
 createPlayer pos angle =
     Player (Circle pos (playerSide / 2)) (V2 0 0) (Aim2D 0 0 angle)
 
-toDrawablePlayer :: Player -> (FilePath, Maybe (Rectangle CInt), CDouble)
-toDrawablePlayer (Player circle _ (Aim2D _ _ angle) _) =
-    toDrawableCircle circle angle playerTextureFile
+toDrawablePlayer :: Player -> (Rectangle CInt, Image PixelRGBA8)
+toDrawablePlayer (Player shape _ (Aim2D _ _ angle) _) =
+    let Circle _ radius = shape
+        center          = Rasterific.V2 radius radius
+    in  toCircleTextureWithOverlay
+            ( withTexture (uniformTexture aimColor)
+            $ withClipping
+                  ( withTransformation (rotateCenter angle center)
+                  $ stroke (playerSide / 3) JoinRound (CapRound, CapRound)
+                  $ line center (Rasterific.V2 playerSide radius)
+                  )
+            $ toDrawing shape
+            )
+            baseColor
+            shape
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle
 createAngle x y oldAngle | isCloseToDefault x && isCloseToDefault y = oldAngle
-                         | otherwise = (atan2 y x) * (180 / pi)
+                         | otherwise = atan2 y x
     where isCloseToDefault direction = abs direction < minAxisPosition
 
 createVelocity :: Direction1D -> Direction1D -> Velocity2D

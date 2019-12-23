@@ -1,7 +1,10 @@
 module Circle
     ( Circle(..)
     , Radius
-    , toDrawableCircle
+    , toTextureArea
+    , toSolidCircleTexture
+    , toCircleTextureWithOverlay
+    , toDrawing
     , areIntersecting
     , isCircleWithinBounds
     , updateCirclePosition
@@ -14,6 +17,11 @@ import           Space
 import           Foreign.C.Types
 import           SDL.Video.Renderer             ( Rectangle(..) )
 import           SDL.Vect
+import           Graphics.Rasterific     hiding ( V2(..) )
+import qualified Graphics.Rasterific           as Rasterific
+                                                ( V2(..) )
+import           Graphics.Rasterific.Texture
+import           Codec.Picture.Types
 import           Data.Maybe
 import           Data.Bifunctor                 ( first
                                                 , second
@@ -38,22 +46,34 @@ data CircularMovement = CircularMovement (Position2D, Vector2D)
                                          Circle deriving (Show)
 data StraightMovement = StraightMovement Position2D Position2D deriving (Show)
 
--- Converts to something that is easily drawable by SDL. Circle has coordinates 
--- on the middle of the texture, whereas the SDL representation has the
--- coordinates specified on the top left corner.
-toDrawableCircle
-    :: Circle
-    -> Angle2D -- texture rotation in clockwise degrees
-    -> FilePath
-    -> (FilePath, Maybe (Rectangle CInt), CDouble)
-toDrawableCircle (Circle position radius) angle textureFile =
-    ( textureFile
-    , Just
-        (Rectangle (toPixelPoint (position - V2 radius radius))
-                   (toPixelSize $ boundingBoxSize radius)
+toSolidCircleTexture
+    :: PixelRGBA8 -> Circle -> (Rectangle CInt, Image PixelRGBA8)
+toSolidCircleTexture = toCircleTextureWithOverlay (return ())
+
+toCircleTextureWithOverlay
+    :: Drawing PixelRGBA8 ()
+    -> PixelRGBA8
+    -> Circle
+    -> (Rectangle CInt, Image PixelRGBA8)
+toCircleTextureWithOverlay overlay color shape =
+    let textureArea                 = toTextureArea shape
+        Rectangle _     textureSize = textureArea
+        V2        width height      = fromIntegral <$> textureSize
+        transparent                 = PixelRGBA8 255 255 255 0
+    in  ( textureArea
+        , renderDrawing width height transparent $ do
+            withTexture (uniformTexture color) $ toDrawing shape
+            overlay
         )
-    , toPixelAngle angle
-    )
+
+toDrawing :: Circle -> Drawing PixelRGBA8 ()
+toDrawing (Circle _ radius) =
+    fill $ circle (Rasterific.V2 radius radius) radius
+
+toTextureArea :: Circle -> Rectangle CInt
+toTextureArea (Circle position radius) = Rectangle
+    (toPixelPoint (position - V2 radius radius))
+    (toPixelSize $ boundingBoxSize radius)
 
 boundingBoxSize :: Radius -> V2 Float
 boundingBoxSize radius = V2 diameter diameter where diameter = radius * 2

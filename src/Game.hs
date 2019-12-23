@@ -5,8 +5,12 @@ import           Shot
 import           Space
 import           Circle
 import           SDL
-import           Data.Word                      ( Word8
-                                                )
+import           Graphics.Rasterific     hiding ( V2(..) )
+import qualified Graphics.Rasterific           as Rasterific
+                                                ( V2(..) )
+import           Graphics.Rasterific.Texture
+import           Codec.Picture.Types
+import           Data.Word                      ( Word8 )
 import           Foreign.C.Types
 import           Data.Maybe                     ( mapMaybe
                                                 , maybeToList
@@ -25,6 +29,8 @@ type Pillar = Circle
 data State = Running | Finished deriving (Eq, Show)
 data Game = Game Time Movables Obstacles State deriving Show
 
+pillarColor = PixelRGBA8 0x48 0x2D 0x3B 255
+
 createPillars :: Float -> Float -> [Pillar]
 createPillars boundsWidth boundsHeight =
     let pillarRadius     = 48
@@ -34,12 +40,6 @@ createPillars boundsWidth boundsHeight =
         , y <- [distanceFromEdge, boundsHeight - distanceFromEdge]
         ]
 
-pillarTextureFile :: FilePath
-pillarTextureFile = "textures/pillar.bmp"
-
-gameTextureFiles :: [FilePath]
-gameTextureFiles = pillarTextureFile : playerTextureFile : shotTextureFiles
-
 createGame :: V2 CInt -> Game
 createGame boundsCInt = Game
     0
@@ -47,7 +47,7 @@ createGame boundsCInt = Game
         []
         [ PlayerWithBarrel (createPlayer (V2 xDistanceFromEdge yMiddle) 0 0) []
         , PlayerWithBarrel
-            (createPlayer (V2 (boundsWidth - xDistanceFromEdge) yMiddle) 180 1)
+            (createPlayer (V2 (boundsWidth - xDistanceFromEdge) yMiddle) pi 1)
             []
         ]
     )
@@ -59,12 +59,12 @@ createGame boundsCInt = Game
     yMiddle                     = boundsHeight / 2
     xDistanceFromEdge           = playerSide + playerSide / 2
 
-toDrawableGame :: Game -> [(FilePath, Maybe (Rectangle CInt), CDouble)]
+toDrawableGame :: Game -> [(Rectangle CInt, Image PixelRGBA8)]
 toDrawableGame (Game _ movables (Obstacles _ pillars) _) =
     let Movables _ playersWithBarrels = movables
     in  map toDrawableShot (getAllShots movables)
-            ++ map (toDrawablePlayer . getPlayer) playersWithBarrels
-            ++ map (\c -> toDrawableCircle c 0 pillarTextureFile) pillars
+            ++ map (toDrawablePlayer . getPlayer)     playersWithBarrels
+            ++ map (toSolidCircleTexture pillarColor) pillars
 
 getPlayer :: PlayerWithBarrel -> Player
 getPlayer (PlayerWithBarrel player _) = player

@@ -4,6 +4,11 @@ module Main where
 
 import           SDL
 import           SDL.Vect                       ( Point(..) )
+import           Graphics.Rasterific     hiding ( V2(..) )
+import qualified Graphics.Rasterific           as Rasterific
+                                                ( V2(..) )
+import           Graphics.Rasterific.Texture
+import           Codec.Picture.Types
 import           Control.Concurrent             ( threadDelay )
 import           Game
 import           Foreign.C.Types
@@ -13,9 +18,20 @@ import qualified Data.Map.Strict               as Map
 import           Data.Maybe                     ( fromJust )
 import           Control.Monad
 
+import           Codec.Picture                  ( PixelRGBA8(..)
+                                                , writePng
+                                                )
+import qualified Data.Vector.Storable          as Data
+                                                ( Vector )
+import qualified Data.Vector.Storable.Mutable  as Data
+                                                ( IOVector )
+import           Data.Vector.Generic            ( thaw )
+
 backgroundColor = V4 34 11 21
 windowSize' = V2 800 600
-frameInterval = 16667
+frameInterval = 1667 -- this is smoother than 16667. Why is that? Since the
+                     -- monitor refresh rate is 60 hz, 1/60 * 1000000 micro
+                     -- seconds should be enough
 
 main :: IO ()
 main = do
@@ -26,44 +42,30 @@ main = do
     showWindow window
     joysticks <- availableJoysticks
     mapM_ openJoystick joysticks
-    textureMap <- foldM (appendTexture renderer) Map.empty gameTextureFiles
-    gameLoop renderer (createGame windowSize') textureMap
+    gameLoop renderer (createGame windowSize')
 
-appendTexture
-    :: Renderer
-    -> Map.Map FilePath Texture
-    -> FilePath
-    -> IO (Map.Map FilePath Texture)
-appendTexture renderer textureMap textureFile = do
-    filePath <- getDataFileName textureFile
-    surface  <- loadBMP filePath
-    texture  <- createTextureFromSurface renderer surface
-    freeSurface surface
-    return $ Map.insert textureFile texture textureMap
-
-gameLoop :: Renderer -> Game -> Map.Map FilePath Texture -> IO ()
-gameLoop renderer game textureMap = do
+gameLoop :: Renderer -> Game -> IO ()
+gameLoop renderer game = do
     currentTime <- fromIntegral <$> ticks
     events      <- pollEvents
     let newGame = updateGame events currentTime game
     rendererDrawColor renderer $= backgroundColor maxBound
     clear renderer
-    mapM_ (draw renderer textureMap) $ toDrawableGame newGame
+    mapM_ (draw renderer) $ toDrawableGame newGame
     present renderer
     timeSpent <- fmap (flip (-) currentTime . fromIntegral) ticks
     threadDelay $ frameInterval - timeSpent
-    unless (isFinished newGame) (gameLoop renderer newGame textureMap)
+    unless (isFinished newGame) (gameLoop renderer newGame)
 
-draw
-    :: Renderer
-    -> Map.Map FilePath Texture
-    -> (FilePath, Maybe (Rectangle CInt), CDouble)
-    -> IO ()
-draw renderer textureMap (textureFile, destination, rotation) =
-    copyEx renderer
-           (fromJust (Map.lookup textureFile textureMap))
-           Nothing
-           destination
-           rotation
-           Nothing
+draw :: Renderer -> (Rectangle CInt, Image PixelRGBA8) -> IO ()
+draw renderer (destination, image) = do
+    let rawImageData     = imageData image
+        pitch            = 4 * fromIntegral (imageWidth image)
+        Rectangle _ size = destination
+    mutableVector <- thaw rawImageData
+    surface       <- createRGBSurfaceFrom mutableVector size pitch ABGR8888
+    texture       <- createTextureFromSurface renderer surface
+    freeSurface surface
+    copyEx renderer texture Nothing (Just destination) 0 Nothing
         $ V2 False False
+    destroyTexture texture

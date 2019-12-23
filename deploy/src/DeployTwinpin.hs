@@ -30,12 +30,11 @@ import           Data.List                      ( find )
 import           Data.Bifoldable                ( biconcat )
 
 twinpinVersion = "0.1.1"
-texturesDir = "textures"
 licenseFile = "LICENSE"
 buildExeName = "twinpin-exe"
 deployExeName = "twinpin"
 
-linuxReadmeSrc = "documents" </> "README-linux"
+linuxReadmeSrc = "doc" </> "README-linux"
 linuxReadmeTarget = "README"
 
 type UnixTime = Integer
@@ -67,9 +66,6 @@ deployTwinpin = do
                      licenseFile
                      (licenseFile ++ txtPostfix dist)
                      dist
-    textures <- map (texturesDir </>)
-        <$> Tar.getDirectoryContentsRecursive texturesDir
-    dist <- foldrM (addEntrySamePath currentTime) dist textures
     dist <- addSdlLibrary currentTime dist
 
     let deployDir = distDir </> "deploy"

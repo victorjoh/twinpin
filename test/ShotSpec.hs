@@ -3,6 +3,7 @@ module ShotSpec where
 import           Test.Hspec
 import           SDL.Vect
 import           Shot
+import           Circle
 import           Foreign.C.Types
 import           Space                          ( Bounds2D(..) )
 import           SDL.Video.Renderer             ( Rectangle(..) )
@@ -10,21 +11,22 @@ import           SDL.Video.Renderer             ( Rectangle(..) )
 spec :: Spec
 spec = do
     describe "toDrawableShot"
-        $          it "converts from shot to something that can be drawn by SDL"
-        $          toDrawableShot (createShot (V2 30.4 49.8) 45)
-        `shouldBe` ( "textures/shot.bmp"
-                   , Just (Rectangle (P (V2 25 44)) (V2 11 11))
-                   , 0
-                   )
+        $ it
+              (  "transforms the position and size of the player to something"
+              ++ " that SDL is familiar with"
+              )
+        $ let shot             = createShot (V2 30.4 49.8) pi
+              (destination, _) = toDrawableShot shot
+          in  destination `shouldBe` toTextureArea (shotToCircle shot)
 
     describe "updateShot"
-        $ it "updates the shot position from passed time and its velocity"
-        $ updateShot 10 (createShot (V2 6 2) 30)
+        $ it "updates the shot position from passed time and the shot velocity"
+        $ updateShot 10 (createShot (V2 6 2) (pi / 6))
         `shouldBe` createShot
                        (V2 (6 + 10 * shotSpeed * sqrt 3 / 2)
                            (2 + 10 * shotSpeed / 2)
                        )
-                       30
+                       (pi / 6)
 
     describe "isShotWithinBounds" $ do
         it "returns true if the shot is within the borders"

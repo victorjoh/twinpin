@@ -29,7 +29,7 @@ type Line2D = (Float, Float, Float)
 
 toVelocity :: Angle2D -> Speed -> Velocity2D
 toVelocity angle speed = V2 (axisVelocity cos) (axisVelocity sin)
-    where axisVelocity trig = (speed * (trig ((pi / 180) * angle)))
+    where axisVelocity trig = speed * trig angle
 
 toPixelPoint :: Position2D -> Point V2 CInt
 toPixelPoint (V2 x y) = P $ V2 (round x) (round y)

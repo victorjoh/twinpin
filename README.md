@@ -1,5 +1,5 @@
 # twinpin
-![twinpin screenshot](images/screenshot.png "twinpin screenshot")
+![twinpin screenshot](doc/screenshot.png "twinpin screenshot")
 
 twinpin is a minimal twin-stick shooter. The two players control their
 characters with gamepads. So far I have only tried it with a Sony DualShock 4
@@ -57,15 +57,13 @@ cabal update
 as written in [this github issue for Haskell IDE
 Engine](https://github.com/haskell/haskell-ide-engine/issues/658).
 
-The textures found in [images](images) are edited with [Inkscape](https://inkscape.org/).
-
 ## twinpin code architecture
 The entry point is found in [Main]. [Main] contains all the IO, in fact all side
 effects of twinpin are limited to [Main] only. [Main] communicates with [Game],
 which is responsible for updating the game state given some user input. Below is
 the complete module dependency graph.
 
-![twinpin module dependencies](images/module-dependencies.svg)
+![twinpin module dependencies](doc/module-dependencies.svg)
 
 Below [Game] in the graph are:
 * [Player], which updates a player's state. A player is represented by a circle
@@ -84,7 +82,7 @@ stack build --copy-compiler-tool graphmod
 ```
 and generate module-dependencies.svg with:
 ```
-stack exec graphmod | dot -Tsvg > images/module-dependencies.svg
+stack exec graphmod | dot -Tsvg > doc/module-dependencies.svg
 ```
 
 [Main]:   app/Main.hs

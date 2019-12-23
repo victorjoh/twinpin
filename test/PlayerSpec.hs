@@ -13,16 +13,18 @@ import           SDL.Input.Joystick             ( JoyButtonState
                                                     )
                                                 )
 import           SDL.Video.Renderer             ( Rectangle(..) )
+import           Codec.Picture.Types
 
 spec :: Spec
 spec = do
     describe "toDrawablePlayer"
-        $ it "converts from player to something that can be drawn by SDL"
-        $ toDrawablePlayer (createPlayer (V2 40 50) 30 0)
-        `shouldBe` ( "textures/player.bmp"
-                   , Just (Rectangle (P (V2 24 34)) (V2 32 32))
-                   , 30
-                   )
+        $ it
+              (  "transforms the position and size of the player to something"
+              ++ " that SDL is familiar with"
+              )
+        $ let player           = createPlayer (V2 40 50) pi 0
+              (destination, _) = toDrawablePlayer player
+          in  destination `shouldBe` toTextureArea (playerToCircle player)
 
     describe "updatePlayer" $ do
         it "moves the player according to the changed left stick position"
@@ -73,7 +75,7 @@ spec = do
                                            1
                                            (Obstacles (createBounds 800 600) [])
                                            old
-              in  getPlayerAngle new `shouldBe` -45
+              in  getPlayerAngle new `shouldBe` -pi / 4
         it
                 (  "does not change the player's aim if the right stick is very"
                 ++ " close to the default position"

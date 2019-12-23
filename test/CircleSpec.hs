@@ -8,16 +8,31 @@ import           SDL.Video.Renderer             ( Rectangle(..) )
 import           Space
 import           System.Timeout                 ( timeout )
 import           Control.Exception.Base         ( evaluate )
+import           Codec.Picture.Types
 
 spec :: Spec
 spec = do
-    describe "toDrawableCircle"
-        $ it "converts from circle to something that can be drawn by SDL"
-        $ toDrawableCircle (Circle (V2 30 45) 5) 45 "texture-file-path"
-        `shouldBe` ( "texture-file-path"
-                   , Just (Rectangle (P (V2 25 40)) (V2 10 10))
-                   , 45
-                   )
+    describe "toSolidCircleTexture"
+        $ it
+              (  "transforms the position and size of the circle to something"
+              ++ " that SDL is familiar with"
+              )
+        $ let (destination, _) = toSolidCircleTexture
+                  (PixelRGBA8 255 255 255 255)
+                  (Circle (V2 30 45) 5)
+          in  destination `shouldBe` (Rectangle (P (V2 25 40)) (V2 10 10))
+
+    describe "toCircleTextureWithOverlay"
+        $ it
+              (  "transforms the position and size of the circle to something"
+              ++ " that SDL is familiar with"
+              )
+        $ let circle           = Circle (V2 30 45) 5
+              (destination, _) = toCircleTextureWithOverlay
+                  (return ())
+                  (PixelRGBA8 255 255 255 255)
+                  circle
+          in  destination `shouldBe` (toTextureArea circle)
 
     describe "areIntersecting" $ do
         it "returns true if two circles are intersected"

@@ -22,22 +22,6 @@ description:         Please see the README on GitHub at <https://github.com/vict
 dependencies:
 - base >= 4.12 && < 5
 
-custom-setup:
-  dependencies:
-  - base >= 4.12 && < 5
-  - Cabal >= 2.4
-  - JuicyPixels
-  - FontyFruity
-  - svg-tree
-  - rasterific-svg
-  - system-filepath
-  - directory
-  - process
-  - filepath
-  - MissingH
-
-data-files: textures/*.bmp
-
 library:
   source-dirs: src
   dependencies:
@@ -46,6 +30,8 @@ library:
   - extra
   - TypeCompose
   - relude
+  - Rasterific
+  - JuicyPixels
 
 executables:
   twinpin-exe:
@@ -59,6 +45,9 @@ executables:
     - twinpin
     - sdl2
     - containers
+    - JuicyPixels
+    - Rasterific
+    - vector
 
 tests:
   twinpin-test:
@@ -72,5 +61,5 @@ tests:
     - twinpin
     - hspec
     - sdl2
-    - extra
     - HUnit-approx
+    - JuicyPixels

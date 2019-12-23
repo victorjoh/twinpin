@@ -14,7 +14,6 @@ import           SDL.Event
 import           SDL.Internal.Types             ( Window(..) )
 import           Foreign.Ptr                    ( nullPtr )
 import           Foreign.C.Types
-import           Data.Tuple.Extra               ( fst3 )
 import           GHC.Int
 
 -- returns how much time is needed for a shot to travel a certain distance
@@ -36,35 +35,27 @@ getFirstBarrel game =
 getShots :: Game -> [Shot]
 getShots (Game _ (Movables shots _) _ _) = shots
 
-getShotTexture :: Shot -> FilePath
-getShotTexture (Shot _ _ texture) = texture
+getShotState :: Shot -> ShotState
+getShotState (Shot _ _ state) = state
 
 spec :: Spec
 spec = do
-    describe "gameTextureFiles"
-        $ it "retreives all the paths to texture files in the game"
-        $ gameTextureFiles
-        `shouldMatchList` [ "textures/shot.bmp"
-                          , "textures/shot-hit.bmp"
-                          , "textures/player.bmp"
-                          , "textures/pillar.bmp"
-                          ]
-
     describe "toDrawableGame"
         $ it "converts from game to something that can be drawn by SDL"
-        $ let player = PlayerWithBarrel (createPlayer (V2 48 350) 0 0) []
-              shot   = createShot (V2 100 200) 0
-              pillar = Circle (V2 60 70) 48
-              game   = Game 0
-                            (Movables [shot] [player])
-                            (Obstacles (createBounds 800 600) [pillar])
-                            Running
+        $ let player           = createPlayer (V2 48 350) 0 0
+              playerWithBarrel = PlayerWithBarrel player []
+              shot             = createShot (V2 100 200) 0
+              pillar           = Circle (V2 60 70) 48
+              game = Game 0
+                          (Movables [shot] [playerWithBarrel])
+                          (Obstacles (createBounds 800 600) [pillar])
+                          Running
               -- just test the order, the tests for the individual draw
               -- functions test that the position and rotation is right
-          in  map fst3 (toDrawableGame game)
-                  `shouldBe` [ shotDefaultTextureFile
-                             , playerTextureFile
-                             , pillarTextureFile
+          in  map fst (toDrawableGame game)
+                  `shouldBe` [ toTextureArea $ shotToCircle shot
+                             , toTextureArea $ playerToCircle player
+                             , toTextureArea pillar
                              ]
 
     describe "updateGame" $ do
@@ -92,7 +83,7 @@ spec = do
                   getFirstBarrel new `shouldBe` [createShot position angle]
         it "can move a shot"
             $ let
-                  shot = createShot (V2 400 300) 90
+                  shot = createShot (V2 400 300) (pi / 2)
                   old  = Game 0
                               (Movables [shot] [])
                               (Obstacles (createBounds 800 600) [])
@@ -122,8 +113,7 @@ spec = do
                                 (Obstacles (createBounds 800 600) [])
                                 Running
                   new = updateGame [] (getShotMovementTime 100) old
-              in  map getShotTexture (getShots new)
-                      `shouldBe` [shotHitTextureFile]
+              in  map getShotState (getShots new) `shouldBe` [HasHitPlayer]
         it
                 (  "changes color of shots that hit players even though they"
                 ++ " haven't left the barrel of the player triggering the shot"
@@ -141,8 +131,8 @@ spec = do
                              Running
                   new = updateGame [] (getShotMovementTime playerRadius) old
               in
-                  map getShotTexture (getFirstBarrel new)
-                      `shouldBe` [shotHitTextureFile]
+                  map getShotState (getFirstBarrel new)
+                      `shouldBe` [HasHitPlayer]
         it "is not finished when the user has not closed the window"
             $ not
             $ isFinished
