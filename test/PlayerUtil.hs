@@ -20,11 +20,14 @@ getPlayerPosition :: Player -> Position2D
 getPlayerPosition player = getCirclePosition $ playerToCircle player
 
 getPlayerAngle :: Player -> Angle2D
-getPlayerAngle (Player _ _ (Aim2D _ _ angle) _) = angle
+getPlayerAngle (Player _ _ (Aim2D _ _ angle) _ _) = angle
+
+getReloadTime :: Player -> ReloadTime
+getReloadTime (Player _ _ _ reloadTime _) = reloadTime
 
 setPlayerVelocity :: Velocity2D -> Player -> Player
-setPlayerVelocity velocity (Player circle _ aim joystickId) =
-    Player circle velocity aim joystickId
+setPlayerVelocity velocity (Player circle _ aim reloadTime joystickId) =
+    Player circle velocity aim reloadTime joystickId
 
 getRequiredStickPosition :: Vector1D -> Time -> Integer
 getRequiredStickPosition distance time =

@@ -153,9 +153,9 @@ updateShots dt (Movables shots playersWithBarrels) = Movables
 
 triggerShots :: [Event] -> Movables -> Movables
 triggerShots events (Movables shots playersWithBarrels) = Movables shots $ map
-    (\(PlayerWithBarrel player barrel) -> PlayerWithBarrel
-        player
-        (barrel ++ maybeToList (triggerShot events player))
+    (\(PlayerWithBarrel player barrel) ->
+        let (newPlayer, maybeShot) = triggerShot events player
+        in  PlayerWithBarrel newPlayer $ barrel ++ maybeToList maybeShot
     )
     playersWithBarrels
 

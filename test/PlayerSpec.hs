@@ -105,26 +105,59 @@ spec = do
                                            (Obstacles (createBounds 800 600) [])
                                            old
               in  new `shouldBe` old
+        it "reduces the reload time according to the passed time"
+            $ let
+                  oldReloadTime = 150
+                  old =
+                      setReloadTime oldReloadTime $ createPlayer (V2 40 50) 0 0
+                  new = updatePlayer []
+                                     50
+                                     (Obstacles (createBounds 800 600) [])
+                                     old
+              in
+                  getReloadTime new `shouldBe` 100
+        it "reduces the reload time no less than 0"
+            $ let
+                  oldReloadTime = 30
+                  old =
+                      setReloadTime oldReloadTime $ createPlayer (V2 40 50) 0 0
+                  new = updatePlayer []
+                                     50
+                                     (Obstacles (createBounds 800 600) [])
+                                     old
+              in
+                  getReloadTime new `shouldBe` 0
 
     describe "triggerShot" $ do
         it "triggers a shot if right bumper button is pressed"
             $ let playerPos      = V2 40 50
                   playerAngle    = 30
+                  player         = createPlayer playerPos playerAngle 0
                   triggerPressed = JoyButtonEventData 0 5 JoyButtonPressed
-              in  triggerShot (toEvents [triggerPressed])
-                              (createPlayer playerPos playerAngle 0)
-                      `shouldBe` Just (createShot playerPos playerAngle)
+              in  triggerShot (toEvents [triggerPressed]) player
+                      `shouldBe` ( setReloadTime minShotInterval player
+                                 , Just (createShot playerPos playerAngle)
+                                 )
         it
                 (  "does not trigger a shot if some other button is pressed"
                 ++ " (x button)"
                 )
             $ let unusedPressed = JoyButtonEventData 0 0 JoyButtonPressed
-              in  triggerShot (toEvents [unusedPressed])
-                              (createPlayer (V2 40 50) 30 0)
+              in
+                  snd
+                          (triggerShot (toEvents [unusedPressed])
+                                       (createPlayer (V2 40 50) 30 0)
+                          )
                       `shouldBe` Nothing
         it "ignores events from different gamepads"
-            $ let playerId       = 1
-                  triggerPressed = JoyButtonEventData 0 5 JoyButtonPressed
-              in  triggerShot (toEvents [triggerPressed])
-                              (createPlayer (V2 40 50) 30 playerId)
+            $ let playerId = 1
+              in
+                  snd
+                          (triggerShot [createTriggerEvent 0]
+                                       (createPlayer (V2 40 50) 30 playerId)
+                          )
                       `shouldBe` Nothing
+        it "does not trigger a shot if the player is reloading"
+            $ let player = setReloadTime 10 $ createPlayer (V2 0 0) 0 0
+              in  triggerShot [createTriggerEvent 0] player
+                      `shouldBe` (player, Nothing)

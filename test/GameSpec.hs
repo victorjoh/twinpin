@@ -81,6 +81,17 @@ spec = do
                   new = updateGame [createTriggerEvent 0] 100 old
               in
                   getFirstBarrel new `shouldBe` [createShot position angle]
+        it "cannot create 2 shots from the same player in rapid succession"
+            $ let
+                  player = PlayerWithBarrel (createPlayer (V2 48 350) 45 0) []
+                  old    = Game 0
+                                (Movables [] [player])
+                                (Obstacles (createBounds 800 600) [])
+                                Running
+                  between = updateGame [createTriggerEvent 0] 1 old
+                  new = updateGame [createTriggerEvent 0] 1 between
+              in
+                  length (getFirstBarrel new) `shouldBe` 1
         it "can move a shot"
             $ let
                   shot = createShot (V2 400 300) (pi / 2)

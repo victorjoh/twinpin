@@ -1,15 +1,17 @@
 module Player
     ( Player(..)
     , Aim2D(..)
+    , ReloadTime
     , playerSide
+    , minShotInterval
     , playerSize
-    , playerTextureFile
     , createPlayer
     , toDrawablePlayer
     , axisPositionToVelocity
     , updatePlayer
     , triggerShot
     , playerToCircle
+    , setReloadTime
     )
 where
 
@@ -41,10 +43,15 @@ type Direction1D = Float
 -- axis. Keep the rotation to cover the case when the aim stick is moved to the
 -- default position (0, 0).
 data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
-data Player = Player Circle Velocity2D Aim2D JoystickID deriving (Show, Eq)
+type ReloadTime = DeltaTime
+data Player = Player Circle Velocity2D Aim2D ReloadTime JoystickID
+                     deriving (Show, Eq)
 
 playerSide :: Size1D
 playerSide = 32
+
+minShotInterval :: ReloadTime
+minShotInterval = 250
 
 axisPositionToVelocity :: Float
 axisPositionToVelocity = 0.00001
@@ -57,15 +64,12 @@ aimColor = PixelRGBA8 0xD3 0x5F 0x5F 255
 playerSize :: Size2D
 playerSize = V2 playerSide playerSide
 
-playerTextureFile :: FilePath
-playerTextureFile = "textures/player.bmp"
-
 createPlayer :: Position2D -> Angle2D -> JoystickID -> Player
 createPlayer pos angle =
-    Player (Circle pos (playerSide / 2)) (V2 0 0) (Aim2D 0 0 angle)
+    Player (Circle pos (playerSide / 2)) (V2 0 0) (Aim2D 0 0 angle) 0
 
 toDrawablePlayer :: Player -> (Rectangle CInt, Image PixelRGBA8)
-toDrawablePlayer (Player shape _ (Aim2D _ _ angle) _) =
+toDrawablePlayer (Player shape _ (Aim2D _ _ angle) _ _) =
     let Circle _ radius = shape
         center          = Rasterific.V2 radius radius
     in  toCircleTextureWithOverlay
@@ -94,16 +98,20 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
         abs direction < minAxisPosition * axisPositionToVelocity
 
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
-updatePlayer events dt obstacles (Player circle velocity aim joystickId) =
-    Player newCircle newVelocity newAim joystickId
-  where
-    axisEvents =
-        map (joyAxisEventAxis &&& joyAxisEventValue)
-            $ filter ((joystickId ==) . joyAxisEventWhich)
-            $ mapMaybe toJoyAxis events
-    newVelocity = foldl updateVelocity velocity axisEvents
-    newAim      = foldl updateAim aim axisEvents
-    newCircle   = updateCollidingCirclePosition newVelocity dt obstacles circle
+updatePlayer events dt obstacles player =
+    let
+        Player circle velocity aim reloadTime joystickId = player
+        axisEvents =
+            map (joyAxisEventAxis &&& joyAxisEventValue)
+                $ filter ((joystickId ==) . joyAxisEventWhich)
+                $ mapMaybe toJoyAxis events
+        newVelocity = foldl updateVelocity velocity axisEvents
+        newAim      = foldl updateAim aim axisEvents
+        newCircle =
+            updateCollidingCirclePosition newVelocity dt obstacles circle
+        newReloadTime = max 0 $ reloadTime - dt
+    in
+        Player newCircle newVelocity newAim newReloadTime joystickId
 
 toJoyAxis :: Event -> Maybe JoyAxisEventData
 toJoyAxis (Event _ (JoyAxisEvent joyAxisEventData)) = Just joyAxisEventData
@@ -125,15 +133,24 @@ updateVelocity (V2 x y) (axisId, axisPosition) =
             1 -> createVelocity x newV
             _ -> V2 x y
 
-triggerShot :: [Event] -> Player -> Maybe Shot
-triggerShot events (Player (Circle position _) _ (Aim2D _ _ angle) joystickId)
-    | elem (rightBumberButtonId, JoyButtonPressed)
-        $ map (joyButtonEventButton &&& joyButtonEventState)
+triggerShot :: [Event] -> Player -> (Player, Maybe Shot)
+triggerShot events player
+    | reloadTime == 0 && elem
+        (rightBumberButtonId, JoyButtonPressed)
+        ( map (joyButtonEventButton &&& joyButtonEventState)
         $ filter ((joystickId ==) . joyButtonEventWhich)
         $ mapMaybe toJoyButton events
-    = Just $ createShot position angle
+        )
+    = (setReloadTime minShotInterval player, Just $ createShot position angle)
     | otherwise
-    = Nothing
+    = (player, Nothing)
+  where
+    Player (Circle position _) _ (Aim2D _ _ angle) reloadTime joystickId =
+        player
+
+setReloadTime :: ReloadTime -> Player -> Player
+setReloadTime reloadTime (Player circle velocity aim _ joystickId) =
+    Player circle velocity aim reloadTime joystickId
 
 toJoyButton :: Event -> Maybe JoyButtonEventData
 toJoyButton (Event _ (JoyButtonEvent joyButtonEventData)) =
@@ -141,4 +158,4 @@ toJoyButton (Event _ (JoyButtonEvent joyButtonEventData)) =
 toJoyButton _ = Nothing
 
 playerToCircle :: Player -> Circle
-playerToCircle (Player circle _ _ _) = circle
+playerToCircle (Player circle _ _ _ _) = circle
