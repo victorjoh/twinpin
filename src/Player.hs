@@ -65,6 +65,7 @@ minAxisPosition = 5000
 rightBumberButtonId = 5
 rightTriggerButtonId = 5
 baseColor = PixelRGBA8 0xE6 0xE6 0xE6 255
+loadShadeColor = PixelRGBA8 0x16 0x0f 0x35 120
 
 playerSize :: Size2D
 playerSize = V2 playerSide playerSide
@@ -74,20 +75,34 @@ createPlayer pos angle =
     Player (Circle pos (playerSide / 2)) (V2 0 0) (Gun (Aim2D 0 0 angle) 0 Idle)
 
 toDrawablePlayer :: Player -> (Rectangle CInt, Image PixelRGBA8)
-toDrawablePlayer (Player shape _ (Gun (Aim2D _ _ angle) _ _) joystickId) =
-    let Circle _ radius = shape
-        center          = Rasterific.V2 radius radius
+toDrawablePlayer (Player shape _ gun joystickId) =
+    let Circle _ radius                    = shape
+        Gun (Aim2D _ _ angle) reloadTime _ = gun
+        center                             = Rasterific.V2 radius radius
+        aimShape =
+                withClipping
+                        ( stroke (playerSide / 3) JoinRound (CapRound, CapRound)
+                        $ line center (Rasterific.V2 playerSide radius)
+                        )
+                    $ toDrawing shape
     in  toCircleTextureWithOverlay
-            ( withTexture (uniformTexture $ aimColor joystickId)
-            $ withClipping
-                  ( withTransformation (rotateCenter angle center)
-                  $ stroke (playerSide / 3) JoinRound (CapRound, CapRound)
-                  $ line center (Rasterific.V2 playerSide radius)
-                  )
-            $ toDrawing shape
+            (withTransformation (rotateCenter angle center) $ do
+                withTexture (uniformTexture $ aimColor joystickId) aimShape
+                withTexture (uniformTexture loadShadeColor) $ withClipping
+                    (fill $ rectangle
+                        (Rasterific.V2 (radius * 2 / 3) (radius * 2 / 3))
+                        (reloadTimeToAimShadowLength (radius * 4 / 3) reloadTime
+                        )
+                        (playerSide / 3)
+                    )
+                    aimShape
             )
             baseColor
             shape
+
+reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
+reloadTimeToAimShadowLength maxShadowWidth reloadTime =
+    maxShadowWidth * fromIntegral reloadTime / fromIntegral minShotInterval
 
 aimColor :: JoystickID -> PixelRGBA8
 aimColor 0 = PixelRGBA8 0x5F 0x5F 0xD3 255
