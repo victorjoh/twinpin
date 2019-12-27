@@ -43,8 +43,10 @@ getRequiredStickPosition distance time =
 
 class EventContent c where
     toEventPayload :: c -> EventPayload
+    toEvent :: c -> Event
+    toEvent = Event 0 . toEventPayload
     toEvents :: [c] -> [Event]
-    toEvents = map (Event 0 . toEventPayload)
+    toEvents = map toEvent
 
 instance EventContent JoyAxisEventData where
     toEventPayload = JoyAxisEvent

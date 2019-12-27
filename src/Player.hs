@@ -14,6 +14,7 @@ module Player
     , triggerShot
     , playerToCircle
     , setGun
+    , triggerMinFireValue
     )
 where
 
@@ -59,8 +60,10 @@ minShotInterval = 250
 axisPositionToVelocity :: Float
 axisPositionToVelocity = 0.00001
 
+triggerMinFireValue = 0
 minAxisPosition = 5000
 rightBumberButtonId = 5
+rightTriggerButtonId = 5
 baseColor = PixelRGBA8 0xE6 0xE6 0xE6 255
 
 playerSize :: Size2D
@@ -145,33 +148,37 @@ triggerShot events player =
         Player (Circle position _) _ gun joystickId = player
         Gun   aim reloadTime state = gun
         Aim2D _   _          angle = aim
-        newState                   = getGunState events state joystickId
+        newState                   = getGunState state joystickId events
         (newReloadTime, maybeShot) = if reloadTime == 0 && newState == Firing
             then (minShotInterval, Just $ createShot position angle)
             else (reloadTime, Nothing)
     in
         (setGun (Gun aim newReloadTime newState) player, maybeShot)
 
-getGunState :: [Event] -> GunState -> JoystickID -> GunState
-getGunState events gunState joystickId =
-    foldr
-            (\eventData _ -> case joyButtonEventState eventData of
-                JoyButtonPressed  -> Firing
-                JoyButtonReleased -> Idle
-            )
-            gunState
-        $ filter ((rightBumberButtonId ==) . joyButtonEventButton)
-        $ filter ((joystickId ==) . joyButtonEventWhich)
-        $ mapMaybe toJoyButton events
+getGunState :: GunState -> JoystickID -> [Event] -> GunState
+getGunState gunState joystickId =
+    foldr const gunState . mapMaybe (eventToGunState joystickId)
+
+eventToGunState :: JoystickID -> Event -> Maybe GunState
+eventToGunState playerId (Event _ (JoyAxisEvent axisEventData)) =
+    let JoyAxisEventData joystickId buttonId amountPressed = axisEventData
+    in  if joystickId == playerId && buttonId == rightTriggerButtonId
+            then if amountPressed > triggerMinFireValue
+                then Just Firing
+                else Just Idle
+            else Nothing
+eventToGunState playerId (Event _ (JoyButtonEvent buttonEventData)) =
+    let JoyButtonEventData joystickId buttonId buttonState = buttonEventData
+    in  if joystickId == playerId && buttonId == rightBumberButtonId
+            then case buttonState of
+                JoyButtonPressed  -> Just Firing
+                JoyButtonReleased -> Just Idle
+            else Nothing
+eventToGunState _ _ = Nothing
 
 setGun :: Gun -> Player -> Player
 setGun gun (Player circle velocity _ joystickId) =
     Player circle velocity gun joystickId
-
-toJoyButton :: Event -> Maybe JoyButtonEventData
-toJoyButton (Event _ (JoyButtonEvent joyButtonEventData)) =
-    Just joyButtonEventData
-toJoyButton _ = Nothing
 
 playerToCircle :: Player -> Circle
 playerToCircle (Player circle _ _ _) = circle

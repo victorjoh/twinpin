@@ -127,13 +127,13 @@ spec = do
                   getReloadTime new `shouldBe` 0
 
     describe "triggerShot" $ do
-        it "triggers a shot if right bumper button is pressed"
+        it "triggers a shot if the right bumper button is pressed"
             $ let playerPos      = V2 40 50
                   playerAngle    = 30
                   player         = createPlayer playerPos playerAngle 0
                   (Gun aim _ _)  = getGun player
                   triggerPressed = JoyButtonEventData 0 5 JoyButtonPressed
-              in  triggerShot (toEvents [triggerPressed]) player
+              in  triggerShot [toEvent triggerPressed] player
                       `shouldBe` ( setGun (Gun aim minShotInterval Firing)
                                           player
                                  , Just (createShot playerPos playerAngle)
@@ -167,3 +167,14 @@ spec = do
                       triggerShot (toEvents [triggerReleased]) between
               in
                   isNothing maybeShot
+        it "triggers a shot if the right trigger button is pressed"
+            $ let triggerPressed = JoyAxisEventData 0 5 (triggerMinFireValue + 1)
+                  player         = createPlayer (V2 0 0) 0 0
+              in  isJust $ snd $ triggerShot [toEvent triggerPressed] player
+        it
+                (  "does not trigger a shot if the right trigger button is not"
+                ++ " pressed far enough"
+                )
+            $ let triggerPressed = JoyAxisEventData 0 5 (triggerMinFireValue - 1)
+                  player         = createPlayer (V2 0 0) 0 0
+              in  isNothing $ snd $ triggerShot [toEvent triggerPressed] player
