@@ -1,5 +1,7 @@
 module Player
     ( Player(..)
+    , Gun(..)
+    , GunState(..)
     , Aim2D(..)
     , ReloadTime
     , playerSide
@@ -11,7 +13,7 @@ module Player
     , updatePlayer
     , triggerShot
     , playerToCircle
-    , setReloadTime
+    , setGun
     )
 where
 
@@ -44,8 +46,9 @@ type Direction1D = Float
 -- default position (0, 0).
 data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
 type ReloadTime = DeltaTime
-data Player = Player Circle Velocity2D Aim2D ReloadTime JoystickID
-                     deriving (Show, Eq)
+data GunState = Firing | Idle deriving (Show, Eq)
+data Gun = Gun Aim2D ReloadTime GunState deriving (Show, Eq)
+data Player = Player Circle Velocity2D Gun JoystickID deriving (Show, Eq)
 
 playerSide :: Size1D
 playerSide = 32
@@ -66,10 +69,10 @@ playerSize = V2 playerSide playerSide
 
 createPlayer :: Position2D -> Angle2D -> JoystickID -> Player
 createPlayer pos angle =
-    Player (Circle pos (playerSide / 2)) (V2 0 0) (Aim2D 0 0 angle) 0
+    Player (Circle pos (playerSide / 2)) (V2 0 0) (Gun (Aim2D 0 0 angle) 0 Idle)
 
 toDrawablePlayer :: Player -> (Rectangle CInt, Image PixelRGBA8)
-toDrawablePlayer (Player shape _ (Aim2D _ _ angle) _ _) =
+toDrawablePlayer (Player shape _ (Gun (Aim2D _ _ angle) _ _) joystickId) =
     let Circle _ radius = shape
         center          = Rasterific.V2 radius radius
     in  toCircleTextureWithOverlay
@@ -100,7 +103,7 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
 updatePlayer events dt obstacles player =
     let
-        Player circle velocity aim reloadTime joystickId = player
+        Player circle velocity (Gun aim reloadTime state) joystickId = player
         axisEvents =
             map (joyAxisEventAxis &&& joyAxisEventValue)
                 $ filter ((joystickId ==) . joyAxisEventWhich)
@@ -111,7 +114,7 @@ updatePlayer events dt obstacles player =
             updateCollidingCirclePosition newVelocity dt obstacles circle
         newReloadTime = max 0 $ reloadTime - dt
     in
-        Player newCircle newVelocity newAim newReloadTime joystickId
+        Player newCircle newVelocity (Gun newAim newReloadTime state) joystickId
 
 toJoyAxis :: Event -> Maybe JoyAxisEventData
 toJoyAxis (Event _ (JoyAxisEvent joyAxisEventData)) = Just joyAxisEventData
@@ -134,23 +137,33 @@ updateVelocity (V2 x y) (axisId, axisPosition) =
             _ -> V2 x y
 
 triggerShot :: [Event] -> Player -> (Player, Maybe Shot)
-triggerShot events player
-    | reloadTime == 0 && elem
-        (rightBumberButtonId, JoyButtonPressed)
-        ( map (joyButtonEventButton &&& joyButtonEventState)
+triggerShot events player =
+    let
+        Player (Circle position _) _ gun joystickId = player
+        Gun   aim reloadTime state = gun
+        Aim2D _   _          angle = aim
+        newState                   = getGunState events state joystickId
+        (newReloadTime, maybeShot) = if reloadTime == 0 && newState == Firing
+            then (minShotInterval, Just $ createShot position angle)
+            else (reloadTime, Nothing)
+    in
+        (setGun (Gun aim newReloadTime newState) player, maybeShot)
+
+getGunState :: [Event] -> GunState -> JoystickID -> GunState
+getGunState events gunState joystickId =
+    foldr
+            (\eventData _ -> case joyButtonEventState eventData of
+                JoyButtonPressed  -> Firing
+                JoyButtonReleased -> Idle
+            )
+            gunState
+        $ filter ((rightBumberButtonId ==) . joyButtonEventButton)
         $ filter ((joystickId ==) . joyButtonEventWhich)
         $ mapMaybe toJoyButton events
-        )
-    = (setReloadTime minShotInterval player, Just $ createShot position angle)
-    | otherwise
-    = (player, Nothing)
-  where
-    Player (Circle position _) _ (Aim2D _ _ angle) reloadTime joystickId =
-        player
 
-setReloadTime :: ReloadTime -> Player -> Player
-setReloadTime reloadTime (Player circle velocity aim _ joystickId) =
-    Player circle velocity aim reloadTime joystickId
+setGun :: Gun -> Player -> Player
+setGun gun (Player circle velocity _ joystickId) =
+    Player circle velocity gun joystickId
 
 toJoyButton :: Event -> Maybe JoyButtonEventData
 toJoyButton (Event _ (JoyButtonEvent joyButtonEventData)) =
@@ -158,4 +171,4 @@ toJoyButton (Event _ (JoyButtonEvent joyButtonEventData)) =
 toJoyButton _ = Nothing
 
 playerToCircle :: Player -> Circle
-playerToCircle (Player circle _ _ _ _) = circle
+playerToCircle (Player circle _ _ _) = circle

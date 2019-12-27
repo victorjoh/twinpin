@@ -8,12 +8,10 @@ import           Circle
 import           Shot                           ( createShot )
 import           SDL.Vect
 import           SDL.Event
-import           SDL.Input.Joystick             ( JoyButtonState
-                                                    ( JoyButtonPressed
-                                                    )
-                                                )
+import           SDL.Input.Joystick             ( JoyButtonState(..) )
 import           SDL.Video.Renderer             ( Rectangle(..) )
 import           Codec.Picture.Types
+import           Data.Maybe
 
 spec :: Spec
 spec = do
@@ -133,9 +131,11 @@ spec = do
             $ let playerPos      = V2 40 50
                   playerAngle    = 30
                   player         = createPlayer playerPos playerAngle 0
+                  (Gun aim _ _)  = getGun player
                   triggerPressed = JoyButtonEventData 0 5 JoyButtonPressed
               in  triggerShot (toEvents [triggerPressed]) player
-                      `shouldBe` ( setReloadTime minShotInterval player
+                      `shouldBe` ( setGun (Gun aim minShotInterval Firing)
+                                          player
                                  , Just (createShot playerPos playerAngle)
                                  )
         it
@@ -143,21 +143,27 @@ spec = do
                 ++ " (x button)"
                 )
             $ let unusedPressed = JoyButtonEventData 0 0 JoyButtonPressed
-              in
-                  snd
-                          (triggerShot (toEvents [unusedPressed])
-                                       (createPlayer (V2 40 50) 30 0)
-                          )
-                      `shouldBe` Nothing
+              in  isNothing $ snd $ triggerShot
+                      (toEvents [unusedPressed])
+                      (createPlayer (V2 40 50) 30 0)
         it "ignores events from different gamepads"
             $ let playerId = 1
-              in
-                  snd
-                          (triggerShot [createTriggerEvent 0]
-                                       (createPlayer (V2 40 50) 30 playerId)
-                          )
-                      `shouldBe` Nothing
+              in  isNothing $ snd $ triggerShot
+                      [createTriggerEvent 0]
+                      (createPlayer (V2 40 50) 30 playerId)
         it "does not trigger a shot if the player is reloading"
             $ let player = setReloadTime 10 $ createPlayer (V2 0 0) 0 0
-              in  triggerShot [createTriggerEvent 0] player
-                      `shouldBe` (player, Nothing)
+              in  isNothing $ snd $ triggerShot [createTriggerEvent 0] player
+        it "keeps shooting while the trigger is pressed"
+            $ let old          = createPlayer (V2 0 0) 0 0
+                  (between, _) = triggerShot [createTriggerEvent 0] old
+              in  isJust $ snd $ triggerShot [] $ setReloadTime 0 between
+        it "stops shooting when the trigger is released"
+            $ let
+                  old             = createPlayer (V2 0 0) 0 0
+                  (between, _)    = triggerShot [createTriggerEvent 0] old
+                  triggerReleased = JoyButtonEventData 0 5 JoyButtonReleased
+                  (_, maybeShot) =
+                      triggerShot (toEvents [triggerReleased]) between
+              in
+                  isNothing maybeShot
