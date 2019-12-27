@@ -62,7 +62,6 @@ axisPositionToVelocity = 0.00001
 minAxisPosition = 5000
 rightBumberButtonId = 5
 baseColor = PixelRGBA8 0xE6 0xE6 0xE6 255
-aimColor = PixelRGBA8 0xD3 0x5F 0x5F 255
 
 playerSize :: Size2D
 playerSize = V2 playerSide playerSide
@@ -76,7 +75,7 @@ toDrawablePlayer (Player shape _ (Gun (Aim2D _ _ angle) _ _) joystickId) =
     let Circle _ radius = shape
         center          = Rasterific.V2 radius radius
     in  toCircleTextureWithOverlay
-            ( withTexture (uniformTexture aimColor)
+            ( withTexture (uniformTexture $ aimColor joystickId)
             $ withClipping
                   ( withTransformation (rotateCenter angle center)
                   $ stroke (playerSide / 3) JoinRound (CapRound, CapRound)
@@ -86,6 +85,10 @@ toDrawablePlayer (Player shape _ (Gun (Aim2D _ _ angle) _ _) joystickId) =
             )
             baseColor
             shape
+
+aimColor :: JoystickID -> PixelRGBA8
+aimColor 0 = PixelRGBA8 0x5F 0x5F 0xD3 255
+aimColor 1 = PixelRGBA8 0xD3 0x5F 0x5F 255
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle

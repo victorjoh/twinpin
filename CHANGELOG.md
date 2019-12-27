@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 * Limited amount of shots per second for each player
 * Players keep firing while trigger is pressed
+* Different colors for the two players
 
 ## [0.1.1] - 2019-12-21
 ### Fixed
