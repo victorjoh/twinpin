@@ -26,6 +26,12 @@ import qualified Data.Vector.Storable          as Data
 import qualified Data.Vector.Storable.Mutable  as Data
                                                 ( IOVector )
 import           Data.Vector.Generic            ( thaw )
+import           Graphics.Text.TrueType         ( loadFontFile
+                                                , Font
+                                                )
+import           System.FilePath                ( (</>) )
+import           Data.Function                  ( (&) )
+import           Data.Tuple.Extra               ( second )
 
 backgroundColor = V4 34 11 21
 windowSize' = V2 800 600
@@ -42,20 +48,23 @@ main = do
     showWindow window
     joysticks <- availableJoysticks
     mapM_ openJoystick joysticks
-    gameLoop renderer (createGame windowSize')
+    font <- join $ either fail return <$> loadFontFile
+        ("fonts" </> "Aller" </> "Aller_Rg.ttf")
+    gameLoop renderer font (createGame windowSize')
 
-gameLoop :: Renderer -> Game -> IO ()
-gameLoop renderer game = do
+gameLoop :: Renderer -> Font -> Game -> IO ()
+gameLoop renderer font game = do
     currentTime <- fromIntegral <$> ticks
     events      <- pollEvents
+    -- unless (null events) $ print events
     let newGame = updateGame events currentTime game
     rendererDrawColor renderer $= backgroundColor maxBound
     clear renderer
-    mapM_ (draw renderer) $ toDrawableGame newGame
+    mapM_ (draw renderer . second (font &)) $ drawGame newGame
     present renderer
     timeSpent <- fmap (flip (-) currentTime . fromIntegral) ticks
     threadDelay $ frameInterval - timeSpent
-    unless (isFinished newGame) (gameLoop renderer newGame)
+    unless (isFinished newGame) (gameLoop renderer font newGame)
 
 draw :: Renderer -> (Rectangle CInt, Image PixelRGBA8) -> IO ()
 draw renderer (destination, image) = do

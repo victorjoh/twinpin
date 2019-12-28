@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Made the players have different colors
 * Players can now also fire using the right trigger
 * Added player reload animation
+* Added pause menu
 
 ## [0.1.1] - 2019-12-21
 ### Fixed

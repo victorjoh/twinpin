@@ -34,7 +34,7 @@ type Radius = Float
 data Circle = Circle Position2D Radius deriving (Show, Eq)
 data Waypoint = Waypoint Position2D WaypointType
 data WaypointType = CircleCollision Circle | BoundsCollision | MovementFinished
-data Obstacles = Obstacles Bounds2D [Circle] deriving (Show)
+data Obstacles = Obstacles Bounds2D [Circle] deriving (Show, Eq)
 
 class Show m => Movement m where
     getStart, getEnd :: m -> Position2D

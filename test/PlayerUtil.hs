@@ -6,7 +6,9 @@ import           CircleUtil
 import           Player
 import           GHC.Int                        ( Int16 )
 import           SDL.Event
-import           Data.Word                      ( Word32 )
+import           Data.Word                      ( Word8
+                                                , Word32
+                                                )
 import           SDL.Raw.Types                  ( JoystickID )
 import           SDL.Input.Joystick             ( JoyButtonState
                                                     ( JoyButtonPressed
@@ -27,6 +29,9 @@ getReloadTime (Player _ _ (Gun _ reloadTime _) _) = reloadTime
 
 getGun :: Player -> Gun
 getGun (Player _ _ gun _) = gun
+
+getGunState :: Player -> GunState
+getGunState player = let (Gun _ _ gunState) = getGun player in gunState
 
 setReloadTime :: ReloadTime -> Player -> Player
 setReloadTime reloadTime player =
@@ -54,6 +59,9 @@ instance EventContent JoyAxisEventData where
 instance EventContent JoyButtonEventData where
     toEventPayload = JoyButtonEvent
 
+instance EventContent JoyHatEventData where
+    toEventPayload = JoyHatEvent
+
 createMoveRightEvent :: JoystickID -> Vector1D -> Word32 -> Event
 createMoveRightEvent playerId distance time =
     let
@@ -79,6 +87,13 @@ createMoveRightEvent playerId distance time =
                     (JoyAxisEventData playerId 0 (fromInteger stickPos))
                 )
 
-createTriggerEvent :: JoystickID -> Event
-createTriggerEvent id =
-    Event 0 (JoyButtonEvent (JoyButtonEventData id 5 JoyButtonPressed))
+createTriggerEvent :: JoystickID -> JoyButtonState -> Event
+createTriggerEvent id state =
+    Event 0 (JoyButtonEvent (JoyButtonEventData id 5 state))
+
+type ButtonID = Word8
+
+createButtonPressedEvent :: JoystickID -> ButtonID -> Event
+createButtonPressedEvent joystickId buttonId = Event
+    0
+    (JoyButtonEvent (JoyButtonEventData joystickId buttonId JoyButtonPressed))

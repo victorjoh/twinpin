@@ -1,211 +1,155 @@
-module Game where
+module Game
+    ( Game(..)
+    , GameState(..)
+    , Menu(..)
+    , createGame
+    , updateGame
+    , drawGame
+    , isFinished
+    )
+where
 
-import           Player
-import           Shot
+import           Match
 import           Space
-import           Circle
-import           SDL
+import           Shot
+import           SDL                     hiding ( Paused )
+import           Foreign.C.Types
+import           Graphics.Text.TrueType         ( Font )
 import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as Rasterific
                                                 ( V2(..) )
 import           Graphics.Rasterific.Texture
 import           Codec.Picture.Types
-import           Data.Word                      ( Word8 )
-import           Foreign.C.Types
-import           Data.Maybe                     ( mapMaybe
-                                                , maybeToList
-                                                )
-import           Data.List                      ( delete
-                                                , partition
-                                                )
-import           Data.Function                  ( (&) )
+import           Data.Tuple.Extra               ( second )
+import           Data.List                      ( foldl' )
 
--- The barrel contains shots that still haven't left the player after firing.
--- These are separated from other shots to make sure that the player isn't
--- immediately hit by his own shot after firing.
-data PlayerWithBarrel = PlayerWithBarrel Player [Shot] deriving Show
-data Movables = Movables [Shot] [PlayerWithBarrel] deriving Show
-type Pillar = Circle
-data State = Running | Finished deriving (Eq, Show)
-data Game = Game Time Movables Obstacles State deriving Show
+data Menu = Resume | Quit deriving (Show, Eq)
+-- collect the events when paused to get the correct initial state when
+-- unpausing
+data GameState = Running Match | Paused Match Menu [Event] | Finished
+                 deriving (Show, Eq)
+data Game = Game Time GameState deriving (Show, Eq)
 
-pillarColor = PixelRGBA8 0x48 0x2D 0x3B 255
-
-createPillars :: Float -> Float -> [Pillar]
-createPillars boundsWidth boundsHeight =
-    let pillarRadius     = 48
-        distanceFromEdge = playerSide * 3 + pillarRadius
-    in  [ Circle (V2 x y) pillarRadius
-        | x <- [distanceFromEdge, boundsWidth - distanceFromEdge]
-        , y <- [distanceFromEdge, boundsHeight - distanceFromEdge]
-        ]
+optionsButtonId = 9
+psButtonId = 10
+cancelButtonId = 1
+acceptButtonId = 0
 
 createGame :: V2 CInt -> Game
-createGame boundsCInt = Game
-    0
-    (Movables
-        []
-        [ PlayerWithBarrel (createPlayer (V2 xDistanceFromEdge yMiddle) 0 0) []
-        , PlayerWithBarrel
-            (createPlayer (V2 (boundsWidth - xDistanceFromEdge) yMiddle) pi 1)
-            []
-        ]
-    )
-    (Obstacles bounds $ createPillars boundsWidth boundsHeight)
-    Running
-  where
-    V2 boundsWidth boundsHeight = fromIntegral <$> boundsCInt
-    bounds                      = createBounds boundsWidth boundsHeight
-    yMiddle                     = boundsHeight / 2
-    xDistanceFromEdge           = playerSide + playerSide / 2
+createGame boundsCInt =
+    Game 0 $ Running (createMatch (fromIntegral <$> boundsCInt))
 
-toDrawableGame :: Game -> [(Rectangle CInt, Image PixelRGBA8)]
-toDrawableGame (Game _ movables (Obstacles _ pillars) _) =
-    let Movables _ playersWithBarrels = movables
-    in  map toDrawableShot (getAllShots movables)
-            ++ map (toDrawablePlayer . getPlayer)     playersWithBarrels
-            ++ map (toSolidCircleTexture pillarColor) pillars
-
-getPlayer :: PlayerWithBarrel -> Player
-getPlayer (PlayerWithBarrel player _) = player
-
-getBarrel :: PlayerWithBarrel -> [Shot]
-getBarrel (PlayerWithBarrel _ barrel) = barrel
-
-mapPlayer :: (Player -> Player) -> PlayerWithBarrel -> PlayerWithBarrel
-mapPlayer f (PlayerWithBarrel player barrel) =
-    PlayerWithBarrel (f player) barrel
-
-mapBarrel :: ([Shot] -> [Shot]) -> PlayerWithBarrel -> PlayerWithBarrel
-mapBarrel f (PlayerWithBarrel player barrel) =
-    PlayerWithBarrel player $ f barrel
-
-getAllShots :: Movables -> [Shot]
-getAllShots (Movables shots playersWithBarrels) =
-    shots ++ concatMap getBarrel playersWithBarrels
-
-mapShots :: ([Shot] -> [Shot]) -> Movables -> Movables
-mapShots f (Movables shots playersWithBarrels) =
-    Movables (f shots) playersWithBarrels
+drawGame :: Game -> [(Rectangle CInt, Font -> Image PixelRGBA8)]
+drawGame (Game _ (Running match)) = map (second const) $ drawMatch match
+drawGame (Game _ (Paused match menu _)) =
+    let
+        selectionPosition = if menu == Resume then 115 else 165
+        menuWidth         = 300
+        menuHeight        = 230
+        textSize          = PointSize 30
+    in
+        map (second const) (drawMatch match)
+            ++ [ ( Rectangle (P $ V2 250 185) (V2 menuWidth menuHeight)
+                 , \font ->
+                     renderDrawing (fromIntegral menuWidth)
+                                   (fromIntegral menuHeight)
+                                   (PixelRGBA8 34 11 21 120)
+                         $ do
+                               withTexture
+                                       (uniformTexture
+                                           (PixelRGBA8 0xE6 0xE6 0xE6 255)
+                                       )
+                                   $ do
+                                         printTextAt font
+                                                     textSize
+                                                     (Rasterific.V2 50 75)
+                                                     "paused"
+                                         printTextAt font
+                                                     textSize
+                                                     (Rasterific.V2 80 125)
+                                                     "resume"
+                                         printTextAt font
+                                                     textSize
+                                                     (Rasterific.V2 80 175)
+                                                     "quit"
+                               withTexture
+                                       (uniformTexture
+                                           (shotColor HasNotHitPlayer)
+                                       )
+                                   $ fill
+                                   $ circle
+                                         (Rasterific.V2 65 selectionPosition)
+                                         shotRadius
+                 )
+               ]
+drawGame (Game _ Finished) = []
 
 updateGame :: [Event] -> Time -> Game -> Game
 updateGame events newTime oldGame =
-    let Game oldTime oldMovables obstacles oldState = oldGame
-        Obstacles bounds pillars = obstacles
-        passedTime               = newTime - oldTime
-        newMovables =
-                oldMovables
-                    -- We remove shots that hit pillars where the shot are in
-                    -- their old state. This is because we want to be able to
-                    -- draw the frame where the shot hits the pillar, i.e. the
-                    -- frame produced from 'oldGame'.
-                    & removePillarHits pillars
-                    & updatePlayers events passedTime obstacles
-                    & updateShots passedTime
-                    & triggerShots events
-                    & registerHits
-                    & exitBarrels
-                    & removeOutOfBounds bounds
-    in  Game newTime
-             newMovables
-             obstacles
-             (if any isClosedEvent events then Finished else oldState)
+    let Game oldTime oldState = oldGame
+        passedTime            = newTime - oldTime
+        newGameState          = switchGameState events
+            $ updateGameState events passedTime oldState
+    in  Game newTime newGameState
 
-removePillarHits :: [Pillar] -> Movables -> Movables
-removePillarHits pillars = mapShots $ filter $ \shot ->
-    not $ any (areIntersecting (shotToCircle shot)) pillars
+updateGameState :: [Event] -> DeltaTime -> GameState -> GameState
+updateGameState events passedTime (Running match) =
+    Running $ updateMatch events passedTime match
+updateGameState events passedTime (Paused match menu previousEvents) =
+    Paused match (updateMenu events menu) (previousEvents ++ events)
+updateGameState _ _ state = state
 
-removeOutOfBounds :: Bounds2D -> Movables -> Movables
-removeOutOfBounds bounds = mapShots (filter (isShotWithinBounds bounds))
+updateMenu :: [Event] -> Menu -> Menu
+updateMenu events menu = foldl' eventToMenu menu events
 
-exitBarrels :: Movables -> Movables
-exitBarrels (Movables shots playersWithBarrels) =
-    foldl exitBarrel (Movables shots []) playersWithBarrels
+eventToMenu :: Menu -> Event -> Menu
+eventToMenu fallback (Event _ (JoyAxisEvent axisEventData)) =
+    let JoyAxisEventData _ axisId axisPosition = axisEventData
+    in  if axisId == 1
+            then if axisPosition < -5000
+                then Resume
+                else if axisPosition > 5000 then Quit else fallback
+            else fallback
+eventToMenu fallback (Event _ (JoyHatEvent (JoyHatEventData _ _ hatPosition)))
+    = case hatPosition of
+        HatUp   -> Resume
+        HatDown -> Quit
+        _       -> fallback
+eventToMenu fallback _ = fallback
 
-exitBarrel :: Movables -> PlayerWithBarrel -> Movables
-exitBarrel (Movables shots playersWithBarrels) (PlayerWithBarrel player barrel)
-    = Movables (shots ++ outsideBarrel)
-               (PlayerWithBarrel player insideBarrel : playersWithBarrels)
-  where
-    (insideBarrel, outsideBarrel) = partition
-        (areIntersecting (playerToCircle player) . shotToCircle)
-        barrel
+switchGameState :: [Event] -> GameState -> GameState
+switchGameState events (Paused match menu previousEvents) =
+    foldl' pausedEventToGameState (Paused match menu previousEvents) events
+switchGameState events (Running match) =
+    foldl' runningEventToGameState (Running match) events
+switchGameState _ Finished = Finished
 
-registerHits :: Movables -> Movables
-registerHits (Movables shots playersWithBarrels) = Movables
-    (map (registerHit players) shots)
-    [ PlayerWithBarrel player (map (registerHit $ delete player players) barrel)
-    | (PlayerWithBarrel player barrel) <- playersWithBarrels
-    ]
-    where players = map getPlayer playersWithBarrels
+pausedEventToGameState :: GameState -> Event -> GameState
+pausedEventToGameState gameState (Event _ (JoyButtonEvent buttonData)) =
+    let JoyButtonEventData _ buttonId buttonState = buttonData
+    in  case gameState of
+            Paused match menu previousEvents ->
+                if buttonId == acceptButtonId && buttonState == JoyButtonPressed
+                    then case menu of
+                        Resume -> Running (updateMatch previousEvents 0 match)
+                        Quit   -> Finished
+                    else Paused match menu previousEvents
+            _ -> gameState
+pausedEventToGameState _         (Event _ (WindowClosedEvent _)) = Finished
+pausedEventToGameState gameState _                               = gameState
 
-registerHit :: [Player] -> Shot -> Shot
-registerHit players shot
-    | any (areIntersecting (shotToCircle shot) . playerToCircle) players
-    = setShotHit shot
-    | otherwise
-    = shot
-
-updateShots :: DeltaTime -> Movables -> Movables
-updateShots dt (Movables shots playersWithBarrels) = Movables
-    (map (updateShot dt) shots)
-    (map (mapBarrel (map (updateShot dt))) playersWithBarrels)
-
-triggerShots :: [Event] -> Movables -> Movables
-triggerShots events (Movables shots playersWithBarrels) = Movables shots $ map
-    (\(PlayerWithBarrel player barrel) ->
-        let (newPlayer, maybeShot) = triggerShot events player
-        in  PlayerWithBarrel newPlayer $ barrel ++ maybeToList maybeShot
-    )
-    playersWithBarrels
-
-updatePlayers :: [Event] -> DeltaTime -> Obstacles -> Movables -> Movables
-updatePlayers _ _ _ (Movables shots []) = Movables shots []
-updatePlayers events dt obstacles movables =
-    let Movables shots (player : playersWithBarrels) = movables
-    in  Movables shots $ updatePlayers' events
-                                        dt
-                                        obstacles
-                                        []
-                                        player
-                                        playersWithBarrels
-
-updatePlayers'
-    :: [Event]
-    -> DeltaTime
-    -> Obstacles
-    -> [PlayerWithBarrel]
-    -> PlayerWithBarrel
-    -> [PlayerWithBarrel]
-    -> [PlayerWithBarrel]
-updatePlayers' events dt obstacles updated toBeUpdated [] =
-    mapPlayer (updatePlayer events dt (addToObstacles updated obstacles))
-              toBeUpdated
-        : updated
-updatePlayers' events dt obstacles updated toBeUpdated (next : notUpdated) =
-    updatePlayers'
-        events
-        dt
-        obstacles
-        ( mapPlayer
-                (updatePlayer events dt (addToObstacles otherPlayers obstacles))
-                toBeUpdated
-
-        : updated
-        )
-        next
-        notUpdated
-    where otherPlayers = updated ++ (next : notUpdated)
-
-addToObstacles :: [PlayerWithBarrel] -> Obstacles -> Obstacles
-addToObstacles playersWithBarrels (Obstacles bounds pillars) =
-    Obstacles bounds
-        $  pillars
-        ++ map (playerToCircle . getPlayer) playersWithBarrels
-
-isClosedEvent :: Event -> Bool
-isClosedEvent (Event _ (WindowClosedEvent _)) = True
-isClosedEvent _                               = False
+runningEventToGameState :: GameState -> Event -> GameState
+runningEventToGameState (Running match) (Event _ (JoyButtonEvent buttonData)) =
+    let JoyButtonEventData _ buttonId buttonState = buttonData
+    in  if (buttonId == optionsButtonId || buttonId == psButtonId)
+               && buttonState
+               == JoyButtonPressed
+            then Paused match Resume []
+            else Running match
+runningEventToGameState _ (Event _ (WindowClosedEvent _)) = Finished
+runningEventToGameState Finished _ = Finished
+runningEventToGameState previousState _ = previousState
 
 isFinished :: Game -> Bool
-isFinished (Game _ _ _ state) = state == Finished
+isFinished (Game _ Finished) = True
+isFinished _                 = False

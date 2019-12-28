@@ -17,6 +17,7 @@ import           Data.ByteString.Lazy          as BS
                                                 )
 import           System.FilePath                ( (</>)
                                                 , (<.>)
+                                                , hasTrailingPathSeparator
                                                 )
 import           System.Directory
 import           System.Info                   as A
@@ -34,6 +35,7 @@ licenseFile = "LICENSE"
 buildExeName = "twinpin-exe"
 deployExeName = "twinpin"
 
+fontsDir = "fonts"
 linuxReadmeSrc = "doc" </> "README-linux"
 linuxReadmeTarget = "README"
 
@@ -66,6 +68,11 @@ deployTwinpin = do
                      licenseFile
                      (licenseFile ++ txtPostfix dist)
                      dist
+    fonts <-
+        map (fontsDir </>)
+        .   filter (not . hasTrailingPathSeparator)
+        <$> Tar.getDirectoryContentsRecursive fontsDir
+    dist <- foldrM (addEntrySamePath currentTime) dist fonts
     dist <- addSdlLibrary currentTime dist
 
     let deployDir = distDir </> "deploy"

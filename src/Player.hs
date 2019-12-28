@@ -8,7 +8,7 @@ module Player
     , minShotInterval
     , playerSize
     , createPlayer
-    , toDrawablePlayer
+    , drawPlayer
     , axisPositionToVelocity
     , updatePlayer
     , triggerShot
@@ -36,6 +36,7 @@ import           Foreign.C.Types
 import           SDL.Raw.Types                  ( JoystickID )
 import           Data.Maybe
 import           Data.Tuple.Extra               ( (&&&) )
+import           Data.List                      ( foldl' )
 
 type ButtonId = Word8
 type AxisId = Word8
@@ -74,8 +75,8 @@ createPlayer :: Position2D -> Angle2D -> JoystickID -> Player
 createPlayer pos angle =
     Player (Circle pos (playerSide / 2)) (V2 0 0) (Gun (Aim2D 0 0 angle) 0 Idle)
 
-toDrawablePlayer :: Player -> (Rectangle CInt, Image PixelRGBA8)
-toDrawablePlayer (Player shape _ gun joystickId) =
+drawPlayer :: Player -> (Rectangle CInt, Image PixelRGBA8)
+drawPlayer (Player shape _ gun joystickId) =
     let Circle _ radius                    = shape
         Gun (Aim2D _ _ angle) reloadTime _ = gun
         center                             = Rasterific.V2 radius radius
@@ -129,8 +130,8 @@ updatePlayer events dt obstacles player =
             map (joyAxisEventAxis &&& joyAxisEventValue)
                 $ filter ((joystickId ==) . joyAxisEventWhich)
                 $ mapMaybe toJoyAxis events
-        newVelocity = foldl updateVelocity velocity axisEvents
-        newAim      = foldl updateAim aim axisEvents
+        newVelocity = foldl' updateVelocity velocity axisEvents
+        newAim      = foldl' updateAim aim axisEvents
         newCircle =
             updateCollidingCirclePosition newVelocity dt obstacles circle
         newReloadTime = max 0 $ reloadTime - dt
@@ -172,7 +173,7 @@ triggerShot events player =
 
 getGunState :: GunState -> JoystickID -> [Event] -> GunState
 getGunState gunState joystickId =
-    foldr const gunState . mapMaybe (eventToGunState joystickId)
+    foldl' seq gunState . mapMaybe (eventToGunState joystickId)
 
 eventToGunState :: JoystickID -> Event -> Maybe GunState
 eventToGunState playerId (Event _ (JoyAxisEvent axisEventData)) =

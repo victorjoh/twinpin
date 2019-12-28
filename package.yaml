@@ -22,6 +22,18 @@ description:         Please see the README on GitHub at <https://github.com/vict
 dependencies:
 - base >= 4.12 && < 5
 
+custom-setup:
+  dependencies:
+  - base >= 4.12 && < 5
+  - Cabal >= 2.4
+  - zip-archive
+  - http-conduit
+  - filepath
+  - tar
+  - directory
+
+data-files: fonts/Aller/*
+
 library:
   source-dirs: src
   dependencies:
@@ -32,6 +44,8 @@ library:
   - relude
   - Rasterific
   - JuicyPixels
+  - FontyFruity
+  - extra
 
 executables:
   twinpin-exe:
@@ -46,8 +60,11 @@ executables:
     - sdl2
     - containers
     - JuicyPixels
+    - FontyFruity
     - Rasterific
     - vector
+    - filepath
+    - extra
 
 tests:
   twinpin-test:

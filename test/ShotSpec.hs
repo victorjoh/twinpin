@@ -10,13 +10,13 @@ import           SDL.Video.Renderer             ( Rectangle(..) )
 
 spec :: Spec
 spec = do
-    describe "toDrawableShot"
+    describe "drawShot"
         $ it
               (  "transforms the position and size of the player to something"
               ++ " that SDL is familiar with"
               )
         $ let shot             = createShot (V2 30.4 49.8) pi
-              (destination, _) = toDrawableShot shot
+              (destination, _) = drawShot shot
           in  destination `shouldBe` toTextureArea (shotToCircle shot)
 
     describe "updateShot"

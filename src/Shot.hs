@@ -2,8 +2,10 @@ module Shot
     ( Shot(..)
     , ShotState(..)
     , shotSpeed
+    , shotRadius
     , createShot
-    , toDrawableShot
+    , drawShot
+    , shotColor
     , updateShot
     , isShotWithinBounds
     , shotToCircle
@@ -27,20 +29,16 @@ data ShotState = HasHitPlayer | HasNotHitPlayer deriving (Show, Eq)
 shotSpeed :: Speed
 shotSpeed = 0.7
 
-side :: Size1D
-side = 32 / 3
-
-size :: Size2D
-size = V2 side side
+shotRadius :: Radius
+shotRadius = 16 / 3
 
 createShot :: Position2D -> Angle2D -> Shot
-createShot position angle = Shot (Circle position (side / 2))
+createShot position angle = Shot (Circle position shotRadius)
                                  (toVelocity angle shotSpeed)
                                  HasNotHitPlayer
 
-toDrawableShot :: Shot -> (Rectangle CInt, Image PixelRGBA8)
-toDrawableShot (Shot circle _ state) =
-    toSolidCircleTexture (shotColor state) circle
+drawShot :: Shot -> (Rectangle CInt, Image PixelRGBA8)
+drawShot (Shot circle _ state) = toSolidCircleTexture (shotColor state) circle
 
 shotColor :: ShotState -> PixelRGBA8
 shotColor HasHitPlayer    = PixelRGBA8 0xd3 0x5f 0x5f 255

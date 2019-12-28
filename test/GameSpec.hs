@@ -2,191 +2,206 @@ module GameSpec where
 
 import           Test.Hspec
 import           Game
-import           Player
-import           PlayerUtil
+import           Match
 import           Circle
-import           CircleUtil
 import           Space
 import           Shot
-import           ShotUtil
-import           SDL.Vect
-import           SDL.Event
+import           Player
+import           PlayerUtil
+import           SDL                     hiding ( Paused )
 import           SDL.Internal.Types             ( Window(..) )
 import           Foreign.Ptr                    ( nullPtr )
-import           Foreign.C.Types
-import           GHC.Int
-
--- returns how much time is needed for a shot to travel a certain distance
-getShotMovementTime :: Vector1D -> Time
-getShotMovementTime distance = round $ distance / shotSpeed
-        -- actualDistance = time * shotSpeed in (time, actualDistance)
-
-getFirstPlayerWithBarrel (Game _ (Movables _ (playerWithBarrel : _)) _ _) =
-    playerWithBarrel
-
-getFirstPlayer :: Game -> Player
-getFirstPlayer game =
-    let PlayerWithBarrel player _ = getFirstPlayerWithBarrel game in player
-
-getFirstBarrel :: Game -> [Shot]
-getFirstBarrel game =
-    let PlayerWithBarrel _ barrel = getFirstPlayerWithBarrel game in barrel
-
-getShots :: Game -> [Shot]
-getShots (Game _ (Movables shots _) _ _) = shots
-
-getShotState :: Shot -> ShotState
-getShotState (Shot _ _ state) = state
+import           MatchUtil
 
 spec :: Spec
 spec = do
-    describe "toDrawableGame"
-        $ it "converts from game to something that can be drawn by SDL"
-        $ let player           = createPlayer (V2 48 350) 0 0
-              playerWithBarrel = PlayerWithBarrel player []
-              shot             = createShot (V2 100 200) 0
-              pillar           = Circle (V2 60 70) 48
-              game = Game 0
-                          (Movables [shot] [playerWithBarrel])
-                          (Obstacles (createBounds 800 600) [pillar])
-                          Running
-              -- just test the order, the tests for the individual draw
-              -- functions test that the position and rotation is right
-          in  map fst (toDrawableGame game)
-                  `shouldBe` [ toTextureArea $ shotToCircle shot
-                             , toTextureArea $ playerToCircle player
-                             , toTextureArea pillar
-                             ]
+    describe "createGame"
+        $ it "creates a game in a running state"
+        $ let size = V2 800 600
+              game = createGame size
+          in  game `shouldBe` Game
+                  0
+                  (Running $ createMatch $ fromIntegral <$> size)
+
+    describe "drawGame" $ do
+        let pillar       = Circle (V2 60 70) 48
+            windowWidth  = 800
+            windowHeight = 600
+            windowBounds = createBounds windowWidth windowHeight
+            match = Match (Movables [] []) (Obstacles windowBounds [pillar])
+        it "draws a match when running"
+            $          map fst (drawGame (Game 0 (Running match)))
+            `shouldBe` [toTextureArea pillar]
+        it "draws the match and the menu on top when paused"
+            $ let menuSize   = V2 300 230
+                  windowSize = V2 windowWidth windowHeight
+                  menuPos    = windowSize / 2 - (fromIntegral <$> menuSize) / 2
+              in  map fst (drawGame (Game 0 (Paused match Resume [])))
+                      `shouldBe` [ toTextureArea pillar
+                                 , Rectangle (P (round <$> menuPos)) menuSize
+                                 ]
+        it "draws nothing when the game is shut down"
+            $          map fst (drawGame (Game 0 Finished))
+            `shouldBe` []
 
     describe "updateGame" $ do
-        it "can move a player"
-            $ let player = PlayerWithBarrel (createPlayer (V2 48 350) 0 0) []
-                  old    = Game 0
-                                (Movables [] [player])
-                                (Obstacles (createBounds 800 600) [])
-                                Running
-                  newTime   = 200
-                  moveEvent = createMoveRightEvent 0 50 (fromIntegral newTime)
-                  new       = updateGame [moveEvent] newTime old
-              in  getPlayerPosition (getFirstPlayer new) `shouldBe` (V2 98 350)
-        it "can create a shot"
-            $ let
-                  position = V2 48 350
-                  angle    = 45
-                  player   = PlayerWithBarrel (createPlayer position angle 0) []
-                  old      = Game 0
-                                  (Movables [] [player])
-                                  (Obstacles (createBounds 800 600) [])
-                                  Running
-                  new = updateGame [createTriggerEvent 0] 100 old
-              in
-                  getFirstBarrel new `shouldBe` [createShot position angle]
-        it "cannot create 2 shots from the same player in rapid succession"
-            $ let
-                  player = PlayerWithBarrel (createPlayer (V2 48 350) 45 0) []
-                  old    = Game 0
-                                (Movables [] [player])
-                                (Obstacles (createBounds 800 600) [])
-                                Running
-                  between = updateGame [createTriggerEvent 0] 1 old
-                  new = updateGame [createTriggerEvent 0] 1 between
-              in
-                  length (getFirstBarrel new) `shouldBe` 1
-        it "can move a shot"
-            $ let
-                  shot = createShot (V2 400 300) (pi / 2)
-                  old  = Game 0
-                              (Movables [shot] [])
-                              (Obstacles (createBounds 800 600) [])
-                              Running
-                  newTime   = getShotMovementTime 50
-                  new       = updateGame [] (getShotMovementTime 50) old
-                  -- expected y should be about 300 + 50 but calculate anyway
-                  -- since time is not a float
-                  expectedY = 300 + (fromIntegral newTime) * shotSpeed
-              in
-                  map getShotPosition (getShots new)
-                      `shouldBe` [V2 400 $ expectedY]
-        it "removes a shot if it is out of bounds"
-            $ let
-                  bounds = createBounds 800 600
-                  shot   = createShot (V2 750 300) 0
-                  old =
-                      Game 0 (Movables [shot] []) (Obstacles bounds []) Running
-                  newTime = getShotMovementTime 100
-              in
-                  getShots (updateGame [] newTime old) `shouldBe` []
-        it "changes color of shots that hit players"
-            $ let shot   = createShot (V2 100 300) 0
-                  player = PlayerWithBarrel (createPlayer (V2 200 300) 0 0) []
-                  old    = Game 0
-                                (Movables [shot] [player])
-                                (Obstacles (createBounds 800 600) [])
-                                Running
-                  new = updateGame [] (getShotMovementTime 100) old
-              in  map getShotState (getShots new) `shouldBe` [HasHitPlayer]
-        it
-                (  "changes color of shots that hit players even though they"
-                ++ " haven't left the barrel of the player triggering the shot"
-                )
-            $ let
-                  shot = createShot (V2 400 300) 0
-                  sourcePlayer =
-                      PlayerWithBarrel (createPlayer (V2 400 300) 0 0) [shot]
-                  targetPlayer = PlayerWithBarrel
-                      (createPlayer (V2 (400 + playerSide) 300) 0 0)
-                      []
-                  old = Game 0
-                             (Movables [] [sourcePlayer, targetPlayer])
-                             (Obstacles (createBounds 800 600) [])
-                             Running
-                  new = updateGame [] (getShotMovementTime playerRadius) old
-              in
-                  map getShotState (getFirstBarrel new)
-                      `shouldBe` [HasHitPlayer]
+        let emptyMatch =
+                Match (Movables [] []) (Obstacles (createBounds 800 600) [])
         it "is not finished when the user has not closed the window"
-            $ not
-            $ isFinished
-            $ updateGame [] 50 (createGame (V2 800 600))
+            $               updateGame [] 50 (createGame $ V2 800 600)
+            `shouldSatisfy` (not . isFinished)
         it "is finished when the user closes the window"
             $ let closedEvent = Event
                       0
                       (WindowClosedEvent
                           (WindowClosedEventData (Window nullPtr))
                       )
-              in  isFinished $ updateGame [closedEvent] 1 $ createGame $ V2 5 5
-        it "can collide two players"
+              in  updateGame [closedEvent] 1 (createGame $ V2 5 5)
+                      `shouldSatisfy` isFinished
+        it "updates the match with how much time has passed since last update"
             $ let
-                  player1 = PlayerWithBarrel (createPlayer (V2 100 300) 0 0) []
-                  player2 = PlayerWithBarrel (createPlayer (V2 200 300) 0 1) []
-                  old     = Game 0
-                                 (Movables [] [player1, player2])
-                                 (Obstacles (createBounds 800 600) [])
-                                 Running
-                  newTime = 1000
-                  movePlayer1Right =
-                      createMoveRightEvent 0 200 (fromIntegral newTime)
-                  new = updateGame [movePlayer1Right] newTime old
+                  shot = createShot (V2 100 300) 0
+                  shotToMatch s = Match
+                      (Movables [s] [])
+                      (Obstacles (createBounds 800 600) [])
+                  game = Game 100 $ Running $ shotToMatch shot
               in
-                  getPlayerPosition (getFirstPlayer new)
-                      `shouldBe` (V2 (200 - playerSide) 300)
-        it "can collide a player with a pillar"
-            $ let player       = createPlayer (V2 100 300) 0 0
-                  pillarRadius = 48
-                  pillar       = Circle (V2 200 300) pillarRadius
-                  old = Game 0
-                             (Movables [] [PlayerWithBarrel player []])
-                             (Obstacles (createBounds 800 600) [pillar])
-                             Running
-                  new = updateGame [(createMoveRightEvent 0 200 1000)] 1000 old
-              in  getPlayerPosition (getFirstPlayer new)
-                      `shouldBe` (V2 (200 - pillarRadius - playerRadius) 300)
-        it "removes a shot that has hit a pillar"
-            $ let pillar = Circle (V2 200 300) 48
-                  old    = Game 0
-                                (Movables [createShot (V2 200 300) 0] [])
-                                -- use wide bounds to make sure the shot is not
-                                -- removed because it is outside the bounds
-                                (Obstacles (createBounds 100000 600) [pillar])
-                                Running
-              in  getShots (updateGame [] 1000 old) `shouldBe` []
+                  updateGame [] 150 game
+                      `shouldBe` Game
+                                     150
+                                     (Running $ shotToMatch $ updateShot 50 shot
+                                     )
+        it "opens the pause menu when the options button is pressed"
+            $ let optionsPressed = createButtonPressedEvent 0 9
+                  game           = Game 0 $ Running emptyMatch
+              in  updateGame [optionsPressed] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Resume [])
+        it "opens the pause menu when the ps button is pressed"
+            $ let psPressed = createButtonPressedEvent 0 10
+                  game      = Game 0 $ Running emptyMatch
+              in  updateGame [psPressed] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Resume [])
+        it
+                (  "resumes the match when the x button is pressed when resume "
+                ++ "is selected in the menu"
+                )
+            $ let xPressed = createButtonPressedEvent 0 0
+                  game     = Game 0 $ Paused emptyMatch Resume []
+              in  updateGame [xPressed] 1 game
+                      `shouldBe` Game 1 (Running emptyMatch)
+        it
+                (  "quits the game when the x button is pressed when quit is "
+                ++ "selected in the menu"
+                )
+            $ let xPressed = createButtonPressedEvent 0 0
+                  game     = Game 0 $ Paused emptyMatch Quit []
+              in  updateGame [xPressed] 1 game `shouldBe` Game 1 Finished
+        it "moves the selection down when the left thumbstick is moved down"
+            $ let stickDown = toEvent $ JoyAxisEventData 0 1 30000
+                  game      = Game 0 $ Paused emptyMatch Resume []
+              in  updateGame [stickDown] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Quit [stickDown])
+        it "moves the selection up when the left thumbstick is moved up"
+            $ let stickUp = toEvent $ JoyAxisEventData 0 1 $ -30000
+                  game    = Game 0 $ Paused emptyMatch Quit []
+              in  updateGame [stickUp] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Resume [stickUp])
+        it
+                (  "moves the selection down when down is pressed on the "
+                ++ "directional buttons"
+                )
+            $ let dirDown = toEvent $ JoyHatEventData 0 0 HatDown
+                  game    = Game 0 $ Paused emptyMatch Resume []
+              in  updateGame [dirDown] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Quit [dirDown])
+        it
+                ("moves the selection up when up is pressed on the directional "
+                ++ "buttons"
+                )
+            $ let dirUp = toEvent $ JoyHatEventData 0 0 HatUp
+                  game  = Game 0 $ Paused emptyMatch Quit []
+              in  updateGame [dirUp] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Resume [dirUp])
+        it "does not update the match while the game is paused"
+            $ let
+                  shot  = createShot (V2 100 300) 0
+                  match = Match (Movables [shot] [])
+                                (Obstacles (createBounds 800 600) [])
+                  game = Game 0 $ Paused match Resume []
+              in
+                  updateGame [] 50 game
+                      `shouldBe` Game 50 (Paused match Resume [])
+        it
+                ("keeps track of thumbstick movements while the game is paused "
+                ++ "so the players are given the correct initial velocity when "
+                ++ "resuming the match"
+                )
+            $ let
+                  player = createPlayer (V2 100 300) 0 0
+                  match  = Match (Movables [] [PlayerWithBarrel player []])
+                                 (Obstacles (createBounds 800 600) [])
+                  game              = Game 0 $ Paused match Resume []
+                  moveRight         = createMoveRightEvent 0 50 200
+                  pausedGame        = updateGame [moveRight] 999 game
+                  xPressed          = createButtonPressedEvent 0 0
+                  switchedToRunning = updateGame [xPressed] 1000 pausedGame
+                  Game _ (Running runningMatch) =
+                      updateGame [] 1200 switchedToRunning
+                  newPosition = getPlayerPosition $ getFirstPlayer runningMatch
+              in
+                  newPosition `shouldBe` V2 150 300
+        it
+                (  "keeps track of trigger changes while the game is paused "
+                ++ "so the players are given the correct initial firing state "
+                ++ "when resuming the match"
+                )
+            $ let
+                  player = createPlayer (V2 100 300) 0 0
+                  shotsToMatch shots = Match
+                      (Movables shots [PlayerWithBarrel player []])
+                      (Obstacles (createBounds 800 600) [])
+                  match             = shotsToMatch []
+                  game              = Game 0 $ Paused match Resume []
+                  triggerPressed    = createTriggerEvent 0 JoyButtonPressed
+                  pausedGame        = updateGame [triggerPressed] 999 game
+                  xPressed          = createButtonPressedEvent 0 0
+                  switchedToRunning = updateGame [xPressed] 1000 pausedGame
+                  Game _ (Running runningMatch) =
+                      updateGame [] 1200 switchedToRunning
+              in
+                  getShots runningMatch
+                      `shouldBe` [updateShot 200 $ createShot (V2 100 300) 0]
+        it
+                (  "only keeps track of the latest change for a button while "
+                ++ "the game is paused"
+                )
+            $ let
+                  player = createPlayer (V2 100 300) 0 0
+                  match  = Match (Movables [] [PlayerWithBarrel player []])
+                                 (Obstacles (createBounds 800 600) [])
+                  game              = Game 0 $ Paused match Resume []
+                  triggerPressed    = createTriggerEvent 0 JoyButtonPressed
+                  firstPressed      = updateGame [triggerPressed] 500 game
+                  triggerReleased   = createTriggerEvent 0 JoyButtonReleased
+                  thenReleased      = updateGame [triggerReleased] 999 game
+                  xPressed          = createButtonPressedEvent 0 0
+                  switchedToRunning = updateGame [xPressed] 1000 thenReleased
+                  Game _ (Running runningMatch) =
+                      updateGame [] 1200 switchedToRunning
+              in
+                  runningMatch `shouldBe` match
+        it
+                ("respects the sequential order of the supplied events when in "
+                ++ "the menu"
+                )
+            $ let game     = Game 0 $ Paused emptyMatch Resume []
+                  moveDown = toEvent $ JoyHatEventData 0 0 HatDown
+                  moveUp   = toEvent $ JoyHatEventData 0 0 HatUp
+              in  updateGame [moveDown, moveUp] 1 game
+                      `shouldBe` Game
+                                     1
+                                     (Paused
+                                         emptyMatch
+                                         Resume
+                                         [moveDown, moveUp]
+                                     )

@@ -15,13 +15,13 @@ import           Data.Maybe
 
 spec :: Spec
 spec = do
-    describe "toDrawablePlayer"
+    describe "drawPlayer"
         $ it
               (  "transforms the position and size of the player to something"
               ++ " that SDL is familiar with"
               )
         $ let player           = createPlayer (V2 40 50) pi 0
-              (destination, _) = toDrawablePlayer player
+              (destination, _) = drawPlayer player
           in  destination `shouldBe` toTextureArea (playerToCircle player)
 
     describe "updatePlayer" $ do
@@ -143,38 +143,62 @@ spec = do
                 ++ " (x button)"
                 )
             $ let unusedPressed = JoyButtonEventData 0 0 JoyButtonPressed
-              in  isNothing $ snd $ triggerShot
+                  maybeShot     = snd $ triggerShot
                       (toEvents [unusedPressed])
                       (createPlayer (V2 40 50) 30 0)
+              in  maybeShot `shouldSatisfy` isNothing
         it "ignores events from different gamepads"
-            $ let playerId = 1
-              in  isNothing $ snd $ triggerShot
-                      [createTriggerEvent 0]
+            $ let playerId  = 1
+                  maybeShot = snd $ triggerShot
+                      [createTriggerEvent 0 JoyButtonPressed]
                       (createPlayer (V2 40 50) 30 playerId)
+              in  maybeShot `shouldSatisfy` isNothing
         it "does not trigger a shot if the player is reloading"
-            $ let player = setReloadTime 10 $ createPlayer (V2 0 0) 0 0
-              in  isNothing $ snd $ triggerShot [createTriggerEvent 0] player
+            $ let
+                  player    = setReloadTime 10 $ createPlayer (V2 0 0) 0 0
+                  maybeShot = snd $ triggerShot
+                      [createTriggerEvent 0 JoyButtonPressed]
+                      player
+              in
+                  maybeShot `shouldSatisfy` isNothing
         it "keeps shooting while the trigger is pressed"
-            $ let old          = createPlayer (V2 0 0) 0 0
-                  (between, _) = triggerShot [createTriggerEvent 0] old
-              in  isJust $ snd $ triggerShot [] $ setReloadTime 0 between
+            $ let
+                  old     = createPlayer (V2 0 0) 0 0
+                  between = fst $ triggerShot
+                      [createTriggerEvent 0 JoyButtonPressed]
+                      old
+                  maybeShot = snd $ triggerShot [] $ setReloadTime 0 between
+              in
+                  maybeShot `shouldSatisfy` isJust
         it "stops shooting when the trigger is released"
             $ let
-                  old             = createPlayer (V2 0 0) 0 0
-                  (between, _)    = triggerShot [createTriggerEvent 0] old
-                  triggerReleased = JoyButtonEventData 0 5 JoyButtonReleased
-                  (_, maybeShot) =
-                      triggerShot (toEvents [triggerReleased]) between
+                  old = createPlayer (V2 0 0) 0 0
+                  (between, _) =
+                      triggerShot [createTriggerEvent 0 JoyButtonPressed] old
+                  reloadedBetween = setReloadTime 0 between
+                  triggerReleased = createTriggerEvent 0 JoyButtonReleased
+                  maybeShot =
+                      snd $ triggerShot [triggerReleased] reloadedBetween
               in
-                  isNothing maybeShot
+                  maybeShot `shouldSatisfy` isNothing
         it "triggers a shot if the right trigger button is pressed"
-            $ let triggerPressed = JoyAxisEventData 0 5 (triggerMinFireValue + 1)
-                  player         = createPlayer (V2 0 0) 0 0
-              in  isJust $ snd $ triggerShot [toEvent triggerPressed] player
+            $ let triggerPressed =
+                      JoyAxisEventData 0 5 (triggerMinFireValue + 1)
+                  player    = createPlayer (V2 0 0) 0 0
+                  maybeShot = snd $ triggerShot [toEvent triggerPressed] player
+              in  maybeShot `shouldSatisfy` isJust
         it
                 (  "does not trigger a shot if the right trigger button is not"
                 ++ " pressed far enough"
                 )
-            $ let triggerPressed = JoyAxisEventData 0 5 (triggerMinFireValue - 1)
-                  player         = createPlayer (V2 0 0) 0 0
-              in  isNothing $ snd $ triggerShot [toEvent triggerPressed] player
+            $ let triggerPressed =
+                      JoyAxisEventData 0 5 (triggerMinFireValue - 1)
+                  player    = createPlayer (V2 0 0) 0 0
+                  maybeShot = snd $ triggerShot [toEvent triggerPressed] player
+              in  maybeShot `shouldSatisfy` isNothing
+        it "respects the sequential order of the supplied events"
+            $ let old             = createPlayer (V2 0 0) 0 0
+                  triggerPressed  = createTriggerEvent 0 JoyButtonPressed
+                  triggerReleased = createTriggerEvent 0 JoyButtonReleased
+                  new = fst $ triggerShot [triggerPressed, triggerReleased] old
+              in  getGunState new `shouldBe` Idle
