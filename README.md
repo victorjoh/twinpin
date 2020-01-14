@@ -29,8 +29,10 @@ and processor architecture
 
 ## Suggested development environment
 To develop twinpin, I use Visual Studio Code with the following extensions:
-* Haskell Language Server (alanz.vscode-hie-server)
-* Rewrap (stkb.rewrap)
+* [Haskell Language Server
+  (alanz.vscode-hie-server)](https://marketplace.visualstudio.com/items?itemName=alanz.vscode-hie-server)
+* [Rewrap
+  (stkb.rewrap)](https://marketplace.visualstudio.com/items?itemName=stkb.rewrap)
 
 Haskell Language Server has a requirement on Haskell IDE Engine. Build it with
 the following commands:
@@ -40,13 +42,6 @@ git clone https://github.com/haskell/haskell-ide-engine --recursive
 cd haskell-ide-engine
 stack ./install.hs build
 ```
-This differs slightly from the installations instructions found in the [README
-for Haskell Language
-Server](https://marketplace.visualstudio.com/items?itemName=alanz.vscode-hie-server).
-The `build-all` target is not available anymore. We don't want to build
-everything anyway since it takes several hours and requires about 30 GB of disk
-space. `build` only builds Haskell Language Server with the latests ghc instead
-of all 8 available for the Haskell Language Server.
 
 Cabal is needed for Haskell IDE Engine to work properly. To install and update
 cabal, run
@@ -66,6 +61,7 @@ the complete module dependency graph.
 ![twinpin module dependencies](doc/module-dependencies.svg)
 
 Below [Game] in the graph are:
+* [Match], which manages interations between all objects in a match
 * [Player], which updates a player's state. A player is represented by a circle
   visually. Given the trigger input a player will fire a shot.
 * [Shot], which updates a shot's state. A shot is represented by a circle
