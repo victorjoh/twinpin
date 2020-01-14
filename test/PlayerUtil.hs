@@ -62,6 +62,9 @@ instance EventContent JoyButtonEventData where
 instance EventContent JoyHatEventData where
     toEventPayload = JoyHatEvent
 
+instance EventContent KeyboardEventData where
+    toEventPayload = KeyboardEvent
+
 createMoveRightEvent :: JoystickID -> Vector1D -> Word32 -> Event
 createMoveRightEvent playerId distance time =
     let

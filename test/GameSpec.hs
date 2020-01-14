@@ -47,6 +47,17 @@ spec = do
     describe "updateGame" $ do
         let emptyMatch =
                 Match (Movables [] []) (Obstacles (createBounds 800 600) [])
+        let noKeyModifier = KeyModifier False
+                                        False
+                                        False
+                                        False
+                                        False
+                                        False
+                                        False
+                                        False
+                                        False
+                                        False
+                                        False
         it "is not finished when the user has not closed the window"
             $               updateGame [] 50 (createGame $ V2 800 600)
             `shouldSatisfy` (not . isFinished)
@@ -81,6 +92,15 @@ spec = do
                   game      = Game 0 $ Running emptyMatch
               in  updateGame [psPressed] 1 game
                       `shouldBe` Game 1 (Paused emptyMatch Resume [])
+        it "opens the pause menu when escape is pressed"
+            $ let escPressed = toEvent $ KeyboardEventData
+                      Nothing
+                      Pressed
+                      False
+                      (Keysym (Scancode 41) (Keycode 27) noKeyModifier)
+                  game = Game 0 $ Running emptyMatch
+              in  updateGame [escPressed] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Resume [])
         it
                 (  "resumes the match when the x button is pressed when resume "
                 ++ "is selected in the menu"
@@ -96,6 +116,17 @@ spec = do
             $ let xPressed = createButtonPressedEvent 0 0
                   game     = Game 0 $ Paused emptyMatch Quit []
               in  updateGame [xPressed] 1 game `shouldBe` Game 1 Finished
+        it
+                (  "quits the game when enter is pressed when quit is selected "
+                ++ "in the menu"
+                )
+            $ let enterPressed = toEvent $ KeyboardEventData
+                      Nothing
+                      Pressed
+                      False
+                      (Keysym (Scancode 40) (Keycode 13) noKeyModifier)
+                  game = Game 0 $ Paused emptyMatch Quit []
+              in  updateGame [enterPressed] 1 game `shouldBe` Game 1 Finished
         it "moves the selection down when the left thumbstick is moved down"
             $ let stickDown = toEvent $ JoyAxisEventData 0 1 30000
                   game      = Game 0 $ Paused emptyMatch Resume []
@@ -122,6 +153,30 @@ spec = do
                   game  = Game 0 $ Paused emptyMatch Quit []
               in  updateGame [dirUp] 1 game
                       `shouldBe` Game 1 (Paused emptyMatch Resume [dirUp])
+        it
+                (  "moves the selection down when arrow down is pressed on the "
+                ++ "keyboard"
+                )
+            $ let arrowDown = toEvent $ KeyboardEventData
+                      Nothing
+                      Pressed
+                      False
+                      (Keysym (Scancode 81) (Keycode 1073741905) noKeyModifier)
+                  game = Game 0 $ Paused emptyMatch Resume []
+              in  updateGame [arrowDown] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Quit [arrowDown])
+        it
+                (  "moves the selection up when arrow up is pressed on the "
+                ++ "keyboard"
+                )
+            $ let arrowUp = toEvent $ KeyboardEventData
+                      Nothing
+                      Pressed
+                      False
+                      (Keysym (Scancode 82) (Keycode 1073741906) noKeyModifier)
+                  game = Game 0 $ Paused emptyMatch Quit []
+              in  updateGame [arrowUp] 1 game
+                      `shouldBe` Game 1 (Paused emptyMatch Resume [arrowUp])
         it "does not update the match while the game is paused"
             $ let
                   shot  = createShot (V2 100 300) 0

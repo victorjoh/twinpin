@@ -105,16 +105,25 @@ updateMenu events menu = foldl' eventToMenu menu events
 eventToMenu :: Menu -> Event -> Menu
 eventToMenu fallback (Event _ (JoyAxisEvent axisEventData)) =
     let JoyAxisEventData _ axisId axisPosition = axisEventData
+        noiseThreshold                         = 5000
     in  if axisId == 1
-            then if axisPosition < -5000
+            then if axisPosition < -noiseThreshold
                 then Resume
-                else if axisPosition > 5000 then Quit else fallback
+                else if axisPosition > noiseThreshold then Quit else fallback
             else fallback
 eventToMenu fallback (Event _ (JoyHatEvent (JoyHatEventData _ _ hatPosition)))
     = case hatPosition of
         HatUp   -> Resume
         HatDown -> Quit
         _       -> fallback
+eventToMenu fallback (Event _ (KeyboardEvent eventData)) =
+    let KeyboardEventData _ motion _ (Keysym (Scancode code) _ _) = eventData
+    in  if motion == Pressed
+            then case code of
+                82 -> Resume
+                81 -> Quit
+                _  -> fallback
+            else fallback
 eventToMenu fallback _ = fallback
 
 switchGameState :: [Event] -> GameState -> GameState
@@ -126,17 +135,22 @@ switchGameState _ Finished = Finished
 
 pausedEventToGameState :: GameState -> Event -> GameState
 pausedEventToGameState gameState (Event _ (JoyButtonEvent buttonData)) =
-    let JoyButtonEventData _ buttonId buttonState = buttonData
-    in  case gameState of
-            Paused match menu previousEvents ->
-                if buttonId == acceptButtonId && buttonState == JoyButtonPressed
-                    then case menu of
-                        Resume -> Running (updateMatch previousEvents 0 match)
-                        Quit   -> Finished
-                    else Paused match menu previousEvents
-            _ -> gameState
+    let JoyButtonEventData _ btnId btnState = buttonData
+        xPressed = btnId == acceptButtonId && btnState == JoyButtonPressed
+    in  chooseSelectedMenuEntryIf gameState xPressed
+pausedEventToGameState gameState (Event _ (KeyboardEvent eventData)) =
+    let KeyboardEventData _ motion _ (Keysym (Scancode code) _ _) = eventData
+        enterPressed = motion == Pressed && code == 40
+    in  chooseSelectedMenuEntryIf gameState enterPressed
 pausedEventToGameState _         (Event _ (WindowClosedEvent _)) = Finished
 pausedEventToGameState gameState _                               = gameState
+
+chooseSelectedMenuEntryIf :: GameState -> Bool -> GameState
+chooseSelectedMenuEntryIf (Paused match Resume previousEvents) True =
+    Running (updateMatch previousEvents 0 match)
+chooseSelectedMenuEntryIf (Paused _ Quit _) True  = Finished
+chooseSelectedMenuEntryIf gameState         True  = gameState
+chooseSelectedMenuEntryIf gameState         False = gameState
 
 runningEventToGameState :: GameState -> Event -> GameState
 runningEventToGameState (Running match) (Event _ (JoyButtonEvent buttonData)) =
@@ -144,6 +158,11 @@ runningEventToGameState (Running match) (Event _ (JoyButtonEvent buttonData)) =
     in  if (buttonId == optionsButtonId || buttonId == psButtonId)
                && buttonState
                == JoyButtonPressed
+            then Paused match Resume []
+            else Running match
+runningEventToGameState (Running match) (Event _ (KeyboardEvent eventData)) =
+    let KeyboardEventData _ motion _ (Keysym (Scancode code) _ _) = eventData
+    in  if motion == Pressed && code == 41
             then Paused match Resume []
             else Running match
 runningEventToGameState _ (Event _ (WindowClosedEvent _)) = Finished
