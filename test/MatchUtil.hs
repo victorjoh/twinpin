@@ -1,13 +1,11 @@
 module MatchUtil where
 
-import           Space
 import           Player
 import           Match
 import           Shot
 
 getFirstPlayerWithBarrel :: Match -> PlayerWithBarrel
-getFirstPlayerWithBarrel (Match (Movables _ (playerWithBarrel : _)) _) =
-    playerWithBarrel
+getFirstPlayerWithBarrel (Match (Movables _ players) _) = head players
 
 toPlayer :: PlayerWithBarrel -> Player
 toPlayer (PlayerWithBarrel player _) = player

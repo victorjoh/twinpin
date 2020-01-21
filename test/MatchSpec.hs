@@ -5,22 +5,17 @@ import           Match
 import           Player
 import           PlayerUtil
 import           Circle
-import           CircleUtil
 import           Space
 import           Shot
 import           ShotUtil
 import           SDL
-import           SDL.Vect
-import           SDL.Event
-import           Foreign.C.Types
-import           GHC.Int
 import           MatchUtil
 
 spec :: Spec
 spec = do
     describe "createMatch"
         $ it "creates two players opposite of each other"
-        $ let Match (Movables _ players) _ = createMatch (V2 800 600)
+        $ let Match (Movables _ players) _ = createMatch
               angles = map (getPlayerAngle . toPlayer) players
               angle1 : angle2 : _ = angles
           in  abs (angleDifference2D angle1 angle2) `shouldBe` pi
@@ -33,13 +28,15 @@ spec = do
               pillar           = Circle (V2 60 70) 48
               match = Match (Movables [shot] [playerWithBarrel])
                             (Obstacles (createBounds 800 600) [pillar])
-              -- just test the order, the tests for the individual draw
-              -- functions test that the position and rotation is right
+            -- just test the order, the tests for the individual draw
+            -- functions test that the position and rotation is right
           in  map fst (drawMatch match)
-                  `shouldBe` [ toTextureArea $ shotToCircle shot
-                             , toTextureArea $ playerToCircle player
-                             , toTextureArea pillar
-                             ]
+                  `shouldBe` map
+                                 fst
+                                 (  [drawShot shot]
+                                 ++ drawPlayer player
+                                 ++ [drawPillar pillar]
+                                 )
 
     describe "updateMatch" $ do
         it "can move a player"
@@ -54,15 +51,16 @@ spec = do
                   getPlayerPosition (getFirstPlayer new) `shouldBe` (V2 98 350)
         it "can create a shot"
             $ let
-                  position = V2 48 350
-                  angle    = 45
-                  player   = PlayerWithBarrel (createPlayer position angle 0) []
-                  old      = Match (Movables [] [player])
-                                   (Obstacles (createBounds 800 600) [])
+                  position  = V2 48 350
+                  direction = 45
+                  player =
+                      PlayerWithBarrel (createPlayer position direction 0) []
+                  old = Match (Movables [] [player])
+                              (Obstacles (createBounds 800 600) [])
                   triggerPressed = createTriggerEvent 0 JoyButtonPressed
                   new            = updateMatch [triggerPressed] 100 old
               in
-                  getFirstBarrel new `shouldBe` [createShot position angle]
+                  getFirstBarrel new `shouldBe` [createShot position direction]
         it "cannot create 2 shots from the same player in rapid succession"
             $ let
                   player = PlayerWithBarrel (createPlayer (V2 48 350) 45 0) []

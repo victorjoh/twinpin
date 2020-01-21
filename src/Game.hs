@@ -3,6 +3,7 @@ module Game
     , GameState(..)
     , Menu(..)
     , createGame
+    , getStaticImages
     , updateGame
     , drawGame
     , isFinished
@@ -11,19 +12,22 @@ where
 
 import           Match
 import           Space
-import           Shot
+import           Visual
+import           Menu
 import           SDL                     hiding ( Paused )
 import           Foreign.C.Types
 import           Graphics.Text.TrueType         ( Font )
+import           Codec.Picture.Types
+import           Data.Tuple.Extra               ( second )
+import           Data.List                      ( foldl' )
+import           Data.Bifunctor                 ( first
+                                                , bimap
+                                                )
 import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as Rasterific
                                                 ( V2(..) )
 import           Graphics.Rasterific.Texture
-import           Codec.Picture.Types
-import           Data.Tuple.Extra               ( second )
-import           Data.List                      ( foldl' )
 
-data Menu = Resume | Quit deriving (Show, Eq)
 -- collect the events when paused to get the correct initial state when
 -- unpausing
 data GameState = Running Match | Paused Match Menu [Event] | Finished
@@ -32,57 +36,72 @@ data Game = Game Time GameState deriving (Show, Eq)
 
 optionsButtonId = 9
 psButtonId = 10
-cancelButtonId = 1
 acceptButtonId = 0
 
-createGame :: V2 CInt -> Game
-createGame boundsCInt =
-    Game 0 $ Running (createMatch (fromIntegral <$> boundsCInt))
+boundsImageId = "bounds"
 
-drawGame :: Game -> [(Rectangle CInt, Font -> Image PixelRGBA8)]
-drawGame (Game _ (Running match)) = map (second const) $ drawMatch match
-drawGame (Game _ (Paused match menu _)) =
+createGame :: Game
+createGame = Game 0 $ Running createMatch
+
+getStaticImages :: Font -> V2 CInt -> [(ImageId, Image PixelRGBA8)]
+getStaticImages font winSize =
+    let (ratio, offset) = getScaleRatioAndOffset matchSize winSize
+        matchRect       = Rectangle (P $ V2 0 0) matchSize
+        scaledRectangle = moveRectangle offset $ scaleRectangle ratio matchRect
+    in  drawBounds winSize scaledRectangle ratio : map
+            (second $ renderScaledVectorImage ratio)
+            (getStaticMenuImage font : staticMatchImages)
+
+drawBounds
+    :: V2 CInt -> Rectangle Float -> ScaleRatio -> (ImageId, Image PixelRGBA8)
+drawBounds winSize matchRectangle ratio =
     let
-        selectionPosition = if menu == Resume then 115 else 165
-        menuWidth         = 300
-        menuHeight        = 230
-        textSize          = PointSize 30
+        V2 windowWidthCInt windowHeightCInt = fromIntegral <$> winSize
+        V2 windowWidth     windowHeight     = fromIntegral <$> winSize
+        Rectangle (P (V2 matchX matchY)) (V2 matchWidth matchHeight) =
+            matchRectangle
+        frameWidth = ratio * 3
     in
-        map (second const) (drawMatch match)
-            ++ [ ( Rectangle (P $ V2 250 185) (V2 menuWidth menuHeight)
-                 , \font ->
-                     renderDrawing (fromIntegral menuWidth)
-                                   (fromIntegral menuHeight)
-                                   (PixelRGBA8 34 11 21 120)
-                         $ do
-                               withTexture
-                                       (uniformTexture
-                                           (PixelRGBA8 0xE6 0xE6 0xE6 255)
-                                       )
-                                   $ do
-                                         printTextAt font
-                                                     textSize
-                                                     (Rasterific.V2 50 75)
-                                                     "paused"
-                                         printTextAt font
-                                                     textSize
-                                                     (Rasterific.V2 80 125)
-                                                     "resume"
-                                         printTextAt font
-                                                     textSize
-                                                     (Rasterific.V2 80 175)
-                                                     "quit"
-                               withTexture
-                                       (uniformTexture
-                                           (shotColor HasNotHitPlayer)
-                                       )
-                                   $ fill
-                                   $ circle
-                                         (Rasterific.V2 65 selectionPosition)
-                                         shotRadius
-                 )
-               ]
-drawGame (Game _ Finished) = []
+        ( boundsImageId
+        , renderDrawing windowWidthCInt windowHeightCInt transparent $ do
+            withTexture (uniformTexture backgroundColorRasterific) $ do
+                fill $ rectangle (Rasterific.V2 0 0) matchX windowHeight
+                fill $ rectangle (Rasterific.V2 0 0) windowWidth matchY
+                fill $ rectangle (Rasterific.V2 0 (matchY + matchHeight))
+                                 windowWidth
+                                 (windowHeight - matchY - matchHeight)
+                fill $ rectangle (Rasterific.V2 (matchX + matchWidth) 0)
+                                 (windowWidth - matchX - matchWidth)
+                                 windowHeight
+            withTexture (uniformTexture pillarColor)
+                $ stroke frameWidth JoinRound (CapRound, CapRound)
+                $ rectangle
+                      (Rasterific.V2 (matchX - frameWidth / 2)
+                                     (matchY - frameWidth / 2)
+                      )
+                      (matchWidth + frameWidth)
+                      (matchHeight + frameWidth)
+        )
+
+transformToWindowArea
+    :: V2 CInt
+    -> (Rectangle Float, Either VectorImage ImageId)
+    -> (Rectangle CInt, Either (Image PixelRGBA8) ImageId)
+transformToWindowArea winSize =
+    let (ratio, offset) = getScaleRatioAndOffset matchSize winSize
+    in  bimap (fmap round . moveRectangle offset . scaleRectangle ratio)
+              (first $ renderScaledVectorImage ratio)
+
+drawGame
+    :: V2 CInt -> Game -> [(Rectangle CInt, Either (Image PixelRGBA8) ImageId)]
+drawGame winSize (Game _ state) =
+    map (transformToWindowArea winSize) (drawGameState state)
+        ++ [(Rectangle (P $ V2 0 0) winSize, Right boundsImageId)]
+
+drawGameState :: GameState -> [(Rectangle Float, Either VectorImage ImageId)]
+drawGameState (Running match      ) = drawMatch match
+drawGameState (Paused match menu _) = drawMatch match ++ drawMenu menu
+drawGameState Finished              = []
 
 updateGame :: [Event] -> Time -> Game -> Game
 updateGame events newTime oldGame =
@@ -95,36 +114,9 @@ updateGame events newTime oldGame =
 updateGameState :: [Event] -> DeltaTime -> GameState -> GameState
 updateGameState events passedTime (Running match) =
     Running $ updateMatch events passedTime match
-updateGameState events passedTime (Paused match menu previousEvents) =
+updateGameState events _ (Paused match menu previousEvents) =
     Paused match (updateMenu events menu) (previousEvents ++ events)
 updateGameState _ _ state = state
-
-updateMenu :: [Event] -> Menu -> Menu
-updateMenu events menu = foldl' eventToMenu menu events
-
-eventToMenu :: Menu -> Event -> Menu
-eventToMenu fallback (Event _ (JoyAxisEvent axisEventData)) =
-    let JoyAxisEventData _ axisId axisPosition = axisEventData
-        noiseThreshold                         = 5000
-    in  if axisId == 1
-            then if axisPosition < -noiseThreshold
-                then Resume
-                else if axisPosition > noiseThreshold then Quit else fallback
-            else fallback
-eventToMenu fallback (Event _ (JoyHatEvent (JoyHatEventData _ _ hatPosition)))
-    = case hatPosition of
-        HatUp   -> Resume
-        HatDown -> Quit
-        _       -> fallback
-eventToMenu fallback (Event _ (KeyboardEvent eventData)) =
-    let KeyboardEventData _ motion _ (Keysym (Scancode code) _ _) = eventData
-    in  if motion == Pressed
-            then case code of
-                82 -> Resume
-                81 -> Quit
-                _  -> fallback
-            else fallback
-eventToMenu fallback _ = fallback
 
 switchGameState :: [Event] -> GameState -> GameState
 switchGameState events (Paused match menu previousEvents) =

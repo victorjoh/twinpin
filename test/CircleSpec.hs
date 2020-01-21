@@ -3,36 +3,18 @@ module CircleSpec where
 import           Test.Hspec
 import           SDL.Vect
 import           Circle
-import           Foreign.C.Types
 import           SDL.Video.Renderer             ( Rectangle(..) )
 import           Space
-import           System.Timeout                 ( timeout )
-import           Control.Exception.Base         ( evaluate )
-import           Codec.Picture.Types
 
 spec :: Spec
 spec = do
-    describe "toSolidCircleTexture"
-        $ it
-              (  "transforms the position and size of the circle to something"
-              ++ " that SDL is familiar with"
-              )
-        $ let (destination, _) = toSolidCircleTexture
-                  (PixelRGBA8 255 255 255 255)
-                  (Circle (V2 30 45) 5)
-          in  destination `shouldBe` (Rectangle (P (V2 25 40)) (V2 10 10))
-
-    describe "toCircleTextureWithOverlay"
-        $ it
-              (  "transforms the position and size of the circle to something"
-              ++ " that SDL is familiar with"
-              )
-        $ let circle           = Circle (V2 30 45) 5
-              (destination, _) = toCircleTextureWithOverlay
-                  (return ())
-                  (PixelRGBA8 255 255 255 255)
-                  circle
-          in  destination `shouldBe` (toTextureArea circle)
+    describe "toTextureArea"
+        $          it
+                       (  "transforms the position and size of the circle to "
+                       ++ "something that SDL is familiar with"
+                       )
+        $          toTextureArea (Circle (V2 30 45) 5)
+        `shouldBe` Rectangle (P (V2 25 40)) (V2 10 10)
 
     describe "areIntersecting" $ do
         it "returns true if two circles are intersected"

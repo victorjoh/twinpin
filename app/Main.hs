@@ -3,39 +3,21 @@
 module Main where
 
 import           SDL
-import           SDL.Vect                       ( Point(..) )
-import           Graphics.Rasterific     hiding ( V2(..) )
-import qualified Graphics.Rasterific           as Rasterific
-                                                ( V2(..) )
-import           Graphics.Rasterific.Texture
 import           Codec.Picture.Types
 import           Control.Concurrent             ( threadDelay )
 import           Game
-import           Foreign.C.Types
-import           Data.Word                      ( Word8 )
-import           Paths_twinpin
+import           Visual                         ( backgroundColorSDL )
+import           Foreign.C.Types                ( CInt )
 import qualified Data.Map.Strict               as Map
 import           Data.Maybe                     ( fromJust )
-import           Control.Monad
-
-import           Codec.Picture                  ( PixelRGBA8(..)
-                                                , writePng
-                                                )
-import qualified Data.Vector.Storable          as Data
-                                                ( Vector )
-import qualified Data.Vector.Storable.Mutable  as Data
-                                                ( IOVector )
+import           Control.Monad                  ( unless )
+import           Codec.Picture                  ( PixelRGBA8(..) )
 import           Data.Vector.Generic            ( thaw )
-import           Graphics.Text.TrueType         ( loadFontFile
-                                                , Font
-                                                )
+import           Graphics.Text.TrueType         ( loadFontFile )
 import           System.FilePath                ( (</>) )
-import           Data.Function                  ( (&) )
-import           Data.Tuple.Extra               ( second )
 
-backgroundColor = V4 34 11 21
 windowSize' = V2 800 600
-frameInterval = 1667 -- this is smoother than 16667. Why is that? Since the
+frameInterval = 6944 -- this is smoother than 16667. Why is that? Since the
                      -- monitor refresh rate is 60 hz, 1/60 * 1000000 micro
                      -- seconds should be enough
 
@@ -43,38 +25,61 @@ main :: IO ()
 main = do
     initialize [InitJoystick, InitVideo]
     window <- createWindow "twinpin"
-                           defaultWindow { windowInitialSize = windowSize' }
+                           defaultWindow { windowMode = FullscreenDesktop }
     renderer <- createRenderer window (-1) defaultRenderer
     showWindow window
     joysticks <- availableJoysticks
     mapM_ openJoystick joysticks
-    font <- join $ either fail return <$> loadFontFile
-        ("fonts" </> "Aller" </> "Aller_Rg.ttf")
-    gameLoop renderer font (createGame windowSize')
+    font <- either fail return
+        =<< loadFontFile ("fonts" </> "Aller" </> "Aller_Rg.ttf")
+    winSize    <- get $ windowSize window
+    textureMap <- mapM (toTexture renderer)
+                       (Map.fromList $ getStaticImages font winSize)
+    gameLoop renderer textureMap winSize createGame
+    mapM_ destroyTexture textureMap
 
-gameLoop :: Renderer -> Font -> Game -> IO ()
-gameLoop renderer font game = do
+gameLoop :: Renderer -> Map.Map String Texture -> V2 CInt -> Game -> IO ()
+gameLoop renderer textureMap winSize game = do
     currentTime <- fromIntegral <$> ticks
     events      <- pollEvents
     -- unless (null events) $ print events
     let newGame = updateGame events currentTime game
-    rendererDrawColor renderer $= backgroundColor maxBound
+    rendererDrawColor renderer $= backgroundColorSDL
     clear renderer
-    mapM_ (draw renderer . second (font &)) $ drawGame newGame
+    mapM_ (draw renderer textureMap) $ drawGame winSize newGame
     present renderer
     timeSpent <- fmap (flip (-) currentTime . fromIntegral) ticks
     threadDelay $ frameInterval - timeSpent
-    unless (isFinished newGame) (gameLoop renderer font newGame)
+    unless (isFinished newGame) (gameLoop renderer textureMap winSize newGame)
 
-draw :: Renderer -> (Rectangle CInt, Image PixelRGBA8) -> IO ()
-draw renderer (destination, image) = do
-    let rawImageData     = imageData image
-        pitch            = 4 * fromIntegral (imageWidth image)
-        Rectangle _ size = destination
+draw
+    :: Renderer
+    -> Map.Map String Texture
+    -> (Rectangle CInt, Either (Image PixelRGBA8) String)
+    -> IO ()
+draw renderer textureMap (destination, generatedOrStatic) = either
+    (\image -> do
+        texture <- toTexture renderer image
+        drawInWindow texture
+        destroyTexture texture
+    )
+    (\imageId -> drawInWindow $ fromJust $ Map.lookup imageId textureMap)
+    generatedOrStatic
+  where
+    drawInWindow tex =
+        copyEx renderer tex Nothing (Just destination) 0 Nothing
+            $ V2 False False
+
+-- the texture should be destroyed by the caller
+toTexture :: Renderer -> Image PixelRGBA8 -> IO Texture
+toTexture renderer image = do
+    let rawImageData = imageData image
+        width        = fromIntegral $ imageWidth image
+        height       = fromIntegral $ imageHeight image
+        size         = V2 width height
+        pitch        = 4 * width
     mutableVector <- thaw rawImageData
     surface       <- createRGBSurfaceFrom mutableVector size pitch ABGR8888
     texture       <- createTextureFromSurface renderer surface
     freeSurface surface
-    copyEx renderer texture Nothing (Just destination) 0 Nothing
-        $ V2 False False
-    destroyTexture texture
+    return texture

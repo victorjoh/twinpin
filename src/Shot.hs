@@ -1,11 +1,11 @@
 module Shot
     ( Shot(..)
     , ShotState(..)
+    , staticShotImages
     , shotSpeed
     , shotRadius
     , createShot
     , drawShot
-    , shotColor
     , updateShot
     , isShotWithinBounds
     , shotToCircle
@@ -15,12 +15,8 @@ where
 
 import           Space
 import           Circle
-import           Foreign.C.Types
+import           Visual
 import           SDL
-import           Graphics.Rasterific     hiding ( V2(..) )
-import qualified Graphics.Rasterific           as Rasterific
-                                                ( V2(..) )
-import           Graphics.Rasterific.Texture
 import           Codec.Picture.Types
 
 data Shot = Shot Circle Velocity2D ShotState deriving (Show, Eq)
@@ -32,17 +28,30 @@ shotSpeed = 0.7
 shotRadius :: Radius
 shotRadius = 16 / 3
 
+hasNotHitPlayerImageId = "hasNotHitPlayerShot"
+hasHitPlayerImageId = "hasHitPlayerShot"
+
 createShot :: Position2D -> Angle2D -> Shot
-createShot position angle = Shot (Circle position shotRadius)
-                                 (toVelocity angle shotSpeed)
-                                 HasNotHitPlayer
+createShot position direction = Shot (Circle position shotRadius)
+                                     (toVelocity direction shotSpeed)
+                                     HasNotHitPlayer
 
-drawShot :: Shot -> (Rectangle CInt, Image PixelRGBA8)
-drawShot (Shot circle _ state) = toSolidCircleTexture (shotColor state) circle
+staticShotImages :: [(ImageId, VectorImage)]
+staticShotImages =
+    [ (imageId, toSolidCircleImage color shotRadius)
+    | (imageId, color) <-
+        [ (hasNotHitPlayerImageId, PixelRGBA8 0xff 0xe6 0x80 255)
+        , (hasHitPlayerImageId   , PixelRGBA8 0xd3 0x5f 0x5f 255)
+        ]
+    ]
 
-shotColor :: ShotState -> PixelRGBA8
-shotColor HasHitPlayer    = PixelRGBA8 0xd3 0x5f 0x5f 255
-shotColor HasNotHitPlayer = PixelRGBA8 0xff 0xe6 0x80 255
+drawShot :: Shot -> (Rectangle Float, Either VectorImage ImageId)
+drawShot (Shot circle _ state) =
+    ( toTextureArea circle
+    , case state of
+        HasNotHitPlayer -> Right hasNotHitPlayerImageId
+        HasHitPlayer    -> Right hasHitPlayerImageId
+    )
 
 updateShot :: DeltaTime -> Shot -> Shot
 updateShot dt (Shot circle velocity state) =

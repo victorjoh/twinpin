@@ -1,7 +1,6 @@
 module Space where
 
 import           SDL.Vect
-import           Foreign.C.Types
 import           Data.Tuple.Extra               ( both )
 
 -- microseconds since library initialization
@@ -28,17 +27,8 @@ data Bounds2D = Bounds2D Bounds1D Bounds1D deriving (Show, Eq)
 type Line2D = (Float, Float, Float)
 
 toVelocity :: Angle2D -> Speed -> Velocity2D
-toVelocity angle speed = V2 (axisVelocity cos) (axisVelocity sin)
-    where axisVelocity trig = speed * trig angle
-
-toPixelPoint :: Position2D -> Point V2 CInt
-toPixelPoint (V2 x y) = P $ V2 (round x) (round y)
-
-toPixelSize :: Size2D -> V2 CInt
-toPixelSize (V2 x y) = V2 (round x) (round y)
-
-toPixelAngle :: Angle2D -> CDouble
-toPixelAngle = realToFrac
+toVelocity rotation speed = V2 (axisVelocity cos) (axisVelocity sin)
+    where axisVelocity trig = speed * trig rotation
 
 updatePosition2D :: Position2D -> Velocity2D -> DeltaTime -> Position2D
 updatePosition2D position velocity dt = position + velocity * fromIntegral dt
@@ -70,12 +60,12 @@ getLineIntersection2D (a1, b1, c1) (a2, b2, c2) =
         zn = determinant a1 b1 a2 b2
     in  if abs zn < epsilon
             then Nothing
-            else Just $ V2 (-(determinant c1 b1 c2 b2) / zn)
-                           (-(determinant a1 c1 a2 c2) / zn)
+            else Just $ V2 (-determinant c1 b1 c2 b2 / zn)
+                           (-determinant a1 c1 a2 c2 / zn)
 
 
 getPositionClosestToOrigin :: Line2D -> Position2D
-getPositionClosestToOrigin (a, b, c) = k @* (V2 a b)
+getPositionClosestToOrigin (a, b, c) = k @* V2 a b
     where k = -c / (a * a + b * b)
 
 offsetLine2D :: Vector2D -> Line2D -> Line2D

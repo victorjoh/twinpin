@@ -69,17 +69,17 @@ createMoveRightEvent :: JoystickID -> Vector1D -> Word32 -> Event
 createMoveRightEvent playerId distance time =
     let
         stickPos = getRequiredStickPosition distance $ fromIntegral time
-        min      = minBound :: Int16
-        max      = maxBound :: Int16
+        minPos   = minBound :: Int16
+        maxPos   = maxBound :: Int16
     in
-        if stickPos < toInteger min || stickPos > toInteger max
+        if stickPos < toInteger minPos || stickPos > toInteger maxPos
             then error
                 (  "The required stick position "
                 ++ show stickPos
                 ++ " is not within the possible Int16 range of ["
-                ++ show min
+                ++ show minPos
                 ++ ", "
-                ++ show max
+                ++ show maxPos
                 ++ "]. the stick position has to be provided in Int16 for"
                 ++ " JoyAxisEventData to accept it. Try using more time for the"
                 ++ " movement."
@@ -91,8 +91,8 @@ createMoveRightEvent playerId distance time =
                 )
 
 createTriggerEvent :: JoystickID -> JoyButtonState -> Event
-createTriggerEvent id state =
-    Event 0 (JoyButtonEvent (JoyButtonEventData id 5 state))
+createTriggerEvent joystickId state =
+    Event 0 (JoyButtonEvent (JoyButtonEventData joystickId 5 state))
 
 type ButtonID = Word8
 

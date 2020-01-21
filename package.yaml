@@ -36,6 +36,9 @@ data-files: fonts/Aller/*
 
 library:
   source-dirs: src
+  ghc-options:
+  - -W
+  - -Wname-shadowing
   dependencies:
   - sdl2
   - containers
@@ -46,6 +49,7 @@ library:
   - JuicyPixels
   - FontyFruity
   - extra
+  - composition
 
 executables:
   twinpin-exe:
@@ -55,6 +59,8 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -W
+    - -Wname-shadowing
     dependencies:
     - twinpin
     - sdl2
@@ -74,6 +80,8 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -W
+    - -Wname-shadowing
     dependencies:
     - twinpin
     - hspec

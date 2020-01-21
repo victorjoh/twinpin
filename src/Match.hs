@@ -1,8 +1,14 @@
+{-# LANGUAGE TupleSections #-}
+
 module Match
     ( Match(..)
     , Movables(..)
     , PlayerWithBarrel(..)
+    , pillarColor
     , createMatch
+    , drawPillar
+    , matchSize
+    , staticMatchImages
     , drawMatch
     , updateMatch
     )
@@ -12,9 +18,9 @@ import           Player
 import           Shot
 import           Space
 import           Circle
+import           Visual
 import           SDL                     hiding ( Paused )
 import           Codec.Picture.Types
-import           Foreign.C.Types
 import           Data.Function                  ( (&) )
 import           Data.Maybe                     ( maybeToList )
 import           Data.List                      ( delete
@@ -31,41 +37,59 @@ type Pillar = Circle
 
 data Match = Match Movables Obstacles deriving (Show, Eq)
 
+pillarColor :: PixelRGBA8
 pillarColor = PixelRGBA8 0x48 0x2D 0x3B 255
+
+pillarRadius = 48
+pillarImageId = "pillar"
 
 createPillars :: Float -> Float -> [Pillar]
 createPillars boundsWidth boundsHeight =
-    let pillarRadius     = 48
-        distanceFromEdge = playerSide * 3 + pillarRadius
+    let distanceFromEdge = playerSide * 3 + pillarRadius
     in  [ Circle (V2 x y) pillarRadius
         | x <- [distanceFromEdge, boundsWidth - distanceFromEdge]
         , y <- [distanceFromEdge, boundsHeight - distanceFromEdge]
         ]
 
-createMatch :: Size2D -> Match
-createMatch (V2 width height) =
-    let bounds            = createBounds width height
-        yMiddle           = height / 2
+matchSize :: Size2D
+matchSize = V2 width height
+
+width = 800
+height = 600
+
+createMatch :: Match
+createMatch =
+    let
+        bounds            = createBounds width height
         xDistanceFromEdge = playerSide + playerSide / 2
-    in  Match
+        createPlayer' x direction playerId = PlayerWithBarrel
+            (createPlayer (V2 x (height / 2)) direction playerId)
+            []
+    in
+        Match
             (Movables
                 []
-                [ PlayerWithBarrel
-                    (createPlayer (V2 xDistanceFromEdge yMiddle) 0 0)
-                    []
-                , PlayerWithBarrel
-                    (createPlayer (V2 (width - xDistanceFromEdge) yMiddle) pi 1)
-                    []
+                [ createPlayer' xDistanceFromEdge           0  0
+                , createPlayer' (width - xDistanceFromEdge) pi 1
                 ]
             )
             (Obstacles bounds $ createPillars width height)
 
-drawMatch :: Match -> [(Rectangle CInt, Image PixelRGBA8)]
+staticMatchImages :: [(ImageId, VectorImage)]
+staticMatchImages =
+    (pillarImageId, toSolidCircleImage pillarColor pillarRadius)
+        : staticPlayerImage
+        : staticShotImages
+
+drawMatch :: Match -> [(Rectangle Float, Either VectorImage ImageId)]
 drawMatch (Match movables (Obstacles _ pillars)) =
     let Movables _ playersWithBarrels = movables
     in  map drawShot (getAllShots movables)
-            ++ map (drawPlayer . getPlayer)           playersWithBarrels
-            ++ map (toSolidCircleTexture pillarColor) pillars
+            ++ concatMap (drawPlayer . getPlayer) playersWithBarrels
+            ++ map drawPillar pillars
+
+drawPillar :: Pillar -> (Rectangle Float, Either VectorImage ImageId)
+drawPillar = (, Right pillarImageId) . toTextureArea
 
 getAllShots :: Movables -> [Shot]
 getAllShots (Movables shots playersWithBarrels) =

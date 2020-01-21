@@ -28,7 +28,6 @@ import           Data.Time.Calendar
 import           Unsafe.Coerce
 import           Data.List.Split                ( splitOn )
 import           Data.List                      ( find )
-import           Data.Bifoldable                ( biconcat )
 
 twinpinVersion = "0.1.1"
 licenseFile = "LICENSE"

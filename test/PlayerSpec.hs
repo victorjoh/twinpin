@@ -9,9 +9,8 @@ import           Shot                           ( createShot )
 import           SDL.Vect
 import           SDL.Event
 import           SDL.Input.Joystick             ( JoyButtonState(..) )
-import           SDL.Video.Renderer             ( Rectangle(..) )
-import           Codec.Picture.Types
 import           Data.Maybe
+import           Data.List                      ( replicate )
 
 spec :: Spec
 spec = do
@@ -20,9 +19,10 @@ spec = do
               (  "transforms the position and size of the player to something"
               ++ " that SDL is familiar with"
               )
-        $ let player           = createPlayer (V2 40 50) pi 0
-              (destination, _) = drawPlayer player
-          in  destination `shouldBe` toTextureArea (playerToCircle player)
+        $ let player    = createPlayer (V2 40 50) pi 0
+              positions = map fst $ drawPlayer player
+          in  positions
+                  `shouldBe` replicate 2 (toTextureArea $ playerToCircle player)
 
     describe "updatePlayer" $ do
         it "moves the player according to the changed left stick position"

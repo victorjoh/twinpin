@@ -4,9 +4,7 @@ import           Test.Hspec
 import           SDL.Vect
 import           Shot
 import           Circle
-import           Foreign.C.Types
 import           Space                          ( Bounds2D(..) )
-import           SDL.Video.Renderer             ( Rectangle(..) )
 
 spec :: Spec
 spec = do

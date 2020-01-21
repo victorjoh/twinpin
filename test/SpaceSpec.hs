@@ -5,7 +5,6 @@ module SpaceSpec where
 import           Test.Hspec
 import           Space
 import           SDL.Vect
-import           Foreign.C.Types
 import           Test.HUnit.Approx
 
 spec :: Spec
@@ -14,21 +13,6 @@ spec = do
         $          it "converts an angle and a speed to a velocity vector"
         $          toVelocity (pi / 6) 2
         `shouldBe` V2 (sqrt 3) 1
-
-    describe "toPixelPoint"
-        $          it "rounds a real 2D point to a pixel 2D point"
-        $          toPixelPoint (V2 3.6 3.4)
-        `shouldBe` P (V2 4 3)
-
-    describe "toPixelSize"
-        $          it "rounds a real 2D size to a pixel 2D size"
-        $          toPixelSize (V2 3.6 3.4)
-        `shouldBe` V2 4 3
-
-    describe "toPixelAngle"
-        $          it "converts a 2D angle to the angle format expected by SDL"
-        $          toPixelAngle 10.5
-        `shouldBe` 10.5
 
     describe "updatePosition2D"
         $          it "moves a position given a velocity and a time"
@@ -219,5 +203,3 @@ spec = do
                 )
             $          isLineBetween2D (V2 (-2) (-1)) (V2 1 (-2)) (0, -1, -1)
             `shouldBe` True
-
-

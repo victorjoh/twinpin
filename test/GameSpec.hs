@@ -7,7 +7,10 @@ import           Circle
 import           Space
 import           Shot
 import           Player
+import           Menu
 import           PlayerUtil
+import           MenuUtil
+import           Visual
 import           SDL                     hiding ( Paused )
 import           SDL.Internal.Types             ( Window(..) )
 import           Foreign.Ptr                    ( nullPtr )
@@ -15,51 +18,58 @@ import           MatchUtil
 
 spec :: Spec
 spec = do
+    let emptyMatch =
+            Match (Movables [] []) (Obstacles (createBounds 800 600) [])
+
     describe "createGame"
-        $ it "creates a game in a running state"
-        $ let size = V2 800 600
-              game = createGame size
-          in  game `shouldBe` Game
-                  0
-                  (Running $ createMatch $ fromIntegral <$> size)
+        $          it "creates a game in a running state"
+        $          createGame
+        `shouldBe` Game 0 (Running createMatch)
 
     describe "drawGame" $ do
-        let pillar       = Circle (V2 60 70) 48
-            windowWidth  = 800
-            windowHeight = 600
-            windowBounds = createBounds windowWidth windowHeight
-            match = Match (Movables [] []) (Obstacles windowBounds [pillar])
         it "draws a match when running"
-            $          map fst (drawGame (Game 0 (Running match)))
-            `shouldBe` [toTextureArea pillar]
+            $ let in map
+                      fst
+                      (drawGame (V2 800 600) (Game 0 (Running emptyMatch)))
+                  `shouldBe` [Rectangle (P (V2 0 0)) (V2 800 600)]
         it "draws the match and the menu on top when paused"
-            $ let menuSize   = V2 300 230
-                  windowSize = V2 windowWidth windowHeight
-                  menuPos    = windowSize / 2 - (fromIntegral <$> menuSize) / 2
-              in  map fst (drawGame (Game 0 (Paused match Resume [])))
-                      `shouldBe` [ toTextureArea pillar
-                                 , Rectangle (P (round <$> menuPos)) menuSize
-                                 ]
-        it "draws nothing when the game is shut down"
-            $          map fst (drawGame (Game 0 Finished))
-            `shouldBe` []
+            $ let game = Game 0 (Paused emptyMatch Resume [])
+              in  map fst (drawGame (V2 800 600) game)
+                  `shouldBe` map (fmap round . fst) (drawMenu Resume)
+                  ++         [Rectangle (P (V2 0 0)) (V2 800 600)]
+        it "only draws the bounds when the game is shut down"
+            $          map fst (drawGame (V2 800 600) (Game 0 Finished))
+            `shouldBe` [Rectangle (P $ V2 0 0) (V2 800 600)]
+        it
+                ("offsets the x position of the menu if the screen has a wider "
+                ++ "aspect ratio than the match"
+                )
+            $ let game = Game 0 (Paused emptyMatch Resume [])
+              in  map fst (drawGame (V2 1600 600) game)
+                  `shouldBe` map
+                                 (fmap round . moveRectangle (V2 400 0) . fst)
+                                 (drawMenu Resume)
+                  ++         [Rectangle (P (V2 0 0)) (V2 1600 600)]
+        it
+                (  "offsets the y position of the menu if the screen has a "
+                ++ "narrower aspect ratio than the match"
+                )
+            $ let game = Game 0 (Paused emptyMatch Resume [])
+              in  map fst (drawGame (V2 800 1200) game)
+                  `shouldBe` map
+                                 (fmap round . moveRectangle (V2 0 300) . fst)
+                                 (drawMenu Resume)
+                  ++         [Rectangle (P (V2 0 0)) (V2 800 1200)]
+        it "scales the menu if the window is higher resolution than the match"
+            $ let game = Game 0 (Paused emptyMatch Resume [])
+              in  map fst (drawGame (V2 1600 1200) game)
+                  `shouldBe` map (fmap round . scaleRectangle 2 . fst)
+                                 (drawMenu Resume)
+                  ++         [Rectangle (P (V2 0 0)) (V2 1600 1200)]
 
     describe "updateGame" $ do
-        let emptyMatch =
-                Match (Movables [] []) (Obstacles (createBounds 800 600) [])
-        let noKeyModifier = KeyModifier False
-                                        False
-                                        False
-                                        False
-                                        False
-                                        False
-                                        False
-                                        False
-                                        False
-                                        False
-                                        False
         it "is not finished when the user has not closed the window"
-            $               updateGame [] 50 (createGame $ V2 800 600)
+            $               updateGame [] 50 createGame
             `shouldSatisfy` (not . isFinished)
         it "is finished when the user closes the window"
             $ let closedEvent = Event
@@ -67,7 +77,7 @@ spec = do
                       (WindowClosedEvent
                           (WindowClosedEventData (Window nullPtr))
                       )
-              in  updateGame [closedEvent] 1 (createGame $ V2 5 5)
+              in  updateGame [closedEvent] 1 createGame
                       `shouldSatisfy` isFinished
         it "updates the match with how much time has passed since last update"
             $ let
@@ -132,51 +142,6 @@ spec = do
                   game      = Game 0 $ Paused emptyMatch Resume []
               in  updateGame [stickDown] 1 game
                       `shouldBe` Game 1 (Paused emptyMatch Quit [stickDown])
-        it "moves the selection up when the left thumbstick is moved up"
-            $ let stickUp = toEvent $ JoyAxisEventData 0 1 $ -30000
-                  game    = Game 0 $ Paused emptyMatch Quit []
-              in  updateGame [stickUp] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Resume [stickUp])
-        it
-                (  "moves the selection down when down is pressed on the "
-                ++ "directional buttons"
-                )
-            $ let dirDown = toEvent $ JoyHatEventData 0 0 HatDown
-                  game    = Game 0 $ Paused emptyMatch Resume []
-              in  updateGame [dirDown] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Quit [dirDown])
-        it
-                ("moves the selection up when up is pressed on the directional "
-                ++ "buttons"
-                )
-            $ let dirUp = toEvent $ JoyHatEventData 0 0 HatUp
-                  game  = Game 0 $ Paused emptyMatch Quit []
-              in  updateGame [dirUp] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Resume [dirUp])
-        it
-                (  "moves the selection down when arrow down is pressed on the "
-                ++ "keyboard"
-                )
-            $ let arrowDown = toEvent $ KeyboardEventData
-                      Nothing
-                      Pressed
-                      False
-                      (Keysym (Scancode 81) (Keycode 1073741905) noKeyModifier)
-                  game = Game 0 $ Paused emptyMatch Resume []
-              in  updateGame [arrowDown] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Quit [arrowDown])
-        it
-                (  "moves the selection up when arrow up is pressed on the "
-                ++ "keyboard"
-                )
-            $ let arrowUp = toEvent $ KeyboardEventData
-                      Nothing
-                      Pressed
-                      False
-                      (Keysym (Scancode 82) (Keycode 1073741906) noKeyModifier)
-                  game = Game 0 $ Paused emptyMatch Quit []
-              in  updateGame [arrowUp] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Resume [arrowUp])
         it "does not update the match while the game is paused"
             $ let
                   shot  = createShot (V2 100 300) 0
@@ -238,7 +203,7 @@ spec = do
                   triggerPressed    = createTriggerEvent 0 JoyButtonPressed
                   firstPressed      = updateGame [triggerPressed] 500 game
                   triggerReleased   = createTriggerEvent 0 JoyButtonReleased
-                  thenReleased      = updateGame [triggerReleased] 999 game
+                  thenReleased = updateGame [triggerReleased] 999 firstPressed
                   xPressed          = createButtonPressedEvent 0 0
                   switchedToRunning = updateGame [xPressed] 1000 thenReleased
                   Game _ (Running runningMatch) =

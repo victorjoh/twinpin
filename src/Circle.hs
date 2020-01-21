@@ -2,9 +2,9 @@ module Circle
     ( Circle(..)
     , Radius
     , toTextureArea
-    , toSolidCircleTexture
-    , toCircleTextureWithOverlay
     , toDrawing
+    , toDiameter
+    , toSolidCircleImage
     , areIntersecting
     , isCircleWithinBounds
     , updateCirclePosition
@@ -14,7 +14,7 @@ module Circle
 where
 
 import           Space
-import           Foreign.C.Types
+import           Visual
 import           SDL.Video.Renderer             ( Rectangle(..) )
 import           SDL.Vect
 import           Graphics.Rasterific     hiding ( V2(..) )
@@ -23,14 +23,14 @@ import qualified Graphics.Rasterific           as Rasterific
 import           Graphics.Rasterific.Texture
 import           Codec.Picture.Types
 import           Data.Maybe
-import           Data.Bifunctor                 ( first
-                                                , second
+import           Data.Bifunctor                 ( second
                                                 , bimap
                                                 )
 import           Data.List                      ( delete )
 import           Relude.Extra.Tuple             ( traverseToFst )
 
 type Radius = Float
+type Diameter = Float
 data Circle = Circle Position2D Radius deriving (Show, Eq)
 data Waypoint = Waypoint Position2D WaypointType
 data WaypointType = CircleCollision Circle | BoundsCollision | MovementFinished
@@ -46,34 +46,22 @@ data CircularMovement = CircularMovement (Position2D, Vector2D)
                                          Circle deriving (Show)
 data StraightMovement = StraightMovement Position2D Position2D deriving (Show)
 
-toSolidCircleTexture
-    :: PixelRGBA8 -> Circle -> (Rectangle CInt, Image PixelRGBA8)
-toSolidCircleTexture = toCircleTextureWithOverlay (return ())
+toSolidCircleImage :: PixelRGBA8 -> Radius -> VectorImage
+toSolidCircleImage color radius =
+    VectorImage (V2 diameter diameter) transparent
+        $ withTexture (uniformTexture color)
+        $ toDrawing radius
+    where diameter = toDiameter radius
 
-toCircleTextureWithOverlay
-    :: Drawing PixelRGBA8 ()
-    -> PixelRGBA8
-    -> Circle
-    -> (Rectangle CInt, Image PixelRGBA8)
-toCircleTextureWithOverlay overlay color shape =
-    let textureArea                 = toTextureArea shape
-        Rectangle _     textureSize = textureArea
-        V2        width height      = fromIntegral <$> textureSize
-        transparent                 = PixelRGBA8 255 255 255 0
-    in  ( textureArea
-        , renderDrawing width height transparent $ do
-            withTexture (uniformTexture color) $ toDrawing shape
-            overlay
-        )
+toDrawing :: Radius -> Drawing PixelRGBA8 ()
+toDrawing radius = fill $ circle (Rasterific.V2 radius radius) radius
 
-toDrawing :: Circle -> Drawing PixelRGBA8 ()
-toDrawing (Circle _ radius) =
-    fill $ circle (Rasterific.V2 radius radius) radius
+toDiameter :: Radius -> Diameter
+toDiameter = (*) 2
 
-toTextureArea :: Circle -> Rectangle CInt
-toTextureArea (Circle position radius) = Rectangle
-    (toPixelPoint (position - V2 radius radius))
-    (toPixelSize $ boundingBoxSize radius)
+toTextureArea :: Circle -> Rectangle Float
+toTextureArea (Circle position radius) =
+    Rectangle (P $ position - V2 radius radius) (boundingBoxSize radius)
 
 boundingBoxSize :: Radius -> V2 Float
 boundingBoxSize radius = V2 diameter diameter where diameter = radius * 2
@@ -279,10 +267,10 @@ instance Movement StraightMovement where
         StraightMovement start end = movement
 
 pairToWaypoint :: (Position2D, Circle) -> Waypoint
-pairToWaypoint (position, circle) = Waypoint position $ CircleCollision circle
+pairToWaypoint (position, shape) = Waypoint position $ CircleCollision shape
 
 getMovementCircleIntersections :: StraightMovement -> Circle -> [Position2D]
-getMovementCircleIntersections (StraightMovement start end) circle =
+getMovementCircleIntersections (StraightMovement start end) shape =
     filter
             (\collision ->
                 epsilon + distance start end > distance start collision
@@ -293,7 +281,7 @@ getMovementCircleIntersections (StraightMovement start end) circle =
                   circleRadius
                   (getLine2D (start - circlePosition) (end - circlePosition))
               )
-    where Circle circlePosition circleRadius = circle
+    where Circle circlePosition circleRadius = shape
 
 getClosestCircleCollision
     :: Position2D
@@ -323,11 +311,10 @@ instance Movement CircularMovement where
       where
         CircularMovement start        end             trajectory = movement
         (                startPosition, startDirection)          = start
-        (                endPosition  , endDirection  )          = end
+        (                _            , endDirection  )          = end
         (Circle trajectoryCenter trajectoryRadius) = trajectory
         bounds' = offsetBounds2D (-trajectoryCenter) bounds
         start'  = startPosition - trajectoryCenter
-        end'    = endPosition - trajectoryCenter
 
     collideWithCircles radiusInMotion movement obstacles =
         fmap
@@ -346,12 +333,11 @@ instance Movement CircularMovement where
                   )
                   obstacles'
       where
-        CircularMovement start        (endPosition, _) trajectory = movement
-        (                startPosition, startDirection )          = start
+        CircularMovement start        _               trajectory = movement
+        (                startPosition, startDirection)          = start
         Circle trajectoryCenter trajectoryRadius = trajectory
         trajectoryCenter' = V2 0 0
         current'          = startPosition - trajectoryCenter
-        target'           = endPosition - trajectoryCenter
         (-@) (Circle pos r) offset = Circle (pos - offset) r
         (+@) (Circle pos r) offset = Circle (pos + offset) r
         obstacles' = map (-@ trajectoryCenter) obstacles
@@ -381,18 +367,18 @@ getCircleCircleIntersections r1 (Circle (V2 x2 y2) r2) =
 -- The circle is centered in origin. Converted from:
 -- https://cp-algorithms.com/geometry/circle-line-intersection.html
 getCircleLineIntersections :: Radius -> Line2D -> [Position2D]
-getCircleLineIntersections r line =
-    let (a, b, c)  = line
-        (V2 x0 y0) = getPositionClosestToOrigin line
+getCircleLineIntersections r l =
+    let (a, b, c)  = l
+        (V2 x0 y0) = getPositionClosestToOrigin l
     in  if c * c > r * r * (a * a + b * b) + epsilon
             then []
             else if abs (c * c - r * r * (a * a + b * b)) < epsilon
                 then [V2 x0 y0]
                 else
-                    let d    = r * r - c * c / (a * a + b * b)
-                        mult = sqrt (d / (a * a + b * b))
-                        ax   = x0 + b * mult
-                        bx   = x0 - b * mult
-                        ay   = y0 - a * mult
-                        by   = y0 + a * mult
+                    let d  = r * r - c * c / (a * a + b * b)
+                        m  = sqrt (d / (a * a + b * b))
+                        ax = x0 + b * m
+                        bx = x0 - b * m
+                        ay = y0 - a * m
+                        by = y0 + a * m
                     in  [V2 ax ay, V2 bx by]
