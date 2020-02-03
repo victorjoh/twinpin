@@ -23,10 +23,10 @@ data Shot = Shot Circle Velocity2D ShotState deriving (Show, Eq)
 data ShotState = HasHitPlayer | HasNotHitPlayer deriving (Show, Eq)
 
 shotSpeed :: Speed
-shotSpeed = 0.7
+shotSpeed = 1.26
 
 shotRadius :: Radius
-shotRadius = 16 / 3
+shotRadius = 10
 
 hasNotHitPlayerImageId = "hasNotHitPlayerShot"
 hasHitPlayerImageId = "hasHitPlayerShot"

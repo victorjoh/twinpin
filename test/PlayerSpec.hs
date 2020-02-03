@@ -34,7 +34,7 @@ spec = do
                                      passedTime
                                      (Obstacles (createBounds 800 600) [])
                                      old
-              in  getPlayerPosition new `shouldBe` V2 45 60
+              in  getPlayerPosition new `shouldBe` V2 49 68
         it
                 (  "does not move the player if the left stick position is very"
                 ++ " close to the default position"

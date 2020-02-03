@@ -51,7 +51,7 @@ data Gun = Gun Aim2D ReloadTime GunState deriving (Show, Eq)
 data Player = Player Circle Velocity2D Gun JoystickID deriving (Show, Eq)
 
 playerSide :: Size1D
-playerSide = 32
+playerSide = 60
 
 playerRadius :: Radius
 playerRadius = playerSide / 2
@@ -60,7 +60,7 @@ minShotInterval :: ReloadTime
 minShotInterval = 250
 
 axisPositionToVelocity :: Float
-axisPositionToVelocity = 0.00001
+axisPositionToVelocity = 0.000018
 
 triggerMinFireValue = 0
 minAxisPosition = 5000

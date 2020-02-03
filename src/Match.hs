@@ -40,7 +40,7 @@ data Match = Match Movables Obstacles deriving (Show, Eq)
 pillarColor :: PixelRGBA8
 pillarColor = PixelRGBA8 0x48 0x2D 0x3B 255
 
-pillarRadius = 48
+pillarRadius = 86
 pillarImageId = "pillar"
 
 createPillars :: Float -> Float -> [Pillar]
@@ -54,8 +54,8 @@ createPillars boundsWidth boundsHeight =
 matchSize :: Size2D
 matchSize = V2 width height
 
-width = 800
-height = 600
+width = 1920
+height = 1080
 
 createMatch :: Match
 createMatch =

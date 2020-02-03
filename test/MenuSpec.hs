@@ -12,14 +12,14 @@ spec :: Spec
 spec = do
     describe "drawMenu" $ do
         it "can draw the menu"
-            $               map fst (drawMenu Resume)
-            `shouldContain` [Rectangle (P (V2 250 185)) (V2 300 230)]
+            $          fst (head $ drawMenu Resume)
+            `shouldBe` Rectangle (P $ V2 690 333) (V2 540 414)
         it "can draw the selection when Resume is selected"
-            $               map fst (drawMenu Resume)
-            `shouldContain` [fst $ drawShot $ createShot (V2 315 300) 0]
+            $          fst (last $ drawMenu Resume)
+            `shouldBe` fst (drawShot $ createShot (V2 807 540) 0)
         it "can draw the selection when Quit is selected"
-            $               map fst (drawMenu Quit)
-            `shouldContain` [fst $ drawShot $ createShot (V2 315 350) 0]
+            $          fst (last $ drawMenu Quit)
+            `shouldBe` fst (drawShot $ createShot (V2 807 630) 0)
 
     describe "updateMenu" $ do
         it "moves the selection down when the left thumbstick is moved down"

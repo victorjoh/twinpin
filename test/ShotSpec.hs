@@ -33,10 +33,10 @@ spec = do
             `shouldBe` True
         it "returns true if the shot is on the border"
             $          isShotWithinBounds (Bounds2D (0, 100) (100, 200))
-                                          (createShot (V2 50 204) 0)
+                                          (createShot (V2 50 208) 0)
             `shouldBe` True
         it "returns false if the shot is outside the border"
             $          isShotWithinBounds (Bounds2D (0, 100) (100, 200))
-                                          (createShot (V2 50 208) 0)
+                                          (createShot (V2 50 211) 0)
             `shouldBe` False
 

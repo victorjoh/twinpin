@@ -1,3 +1,4 @@
+{-# LANGUAGE ImplicitParams #-}
 module MatchSpec where
 
 import           Test.Hspec
@@ -10,6 +11,7 @@ import           Shot
 import           ShotUtil
 import           SDL
 import           MatchUtil
+import           Test.HUnit.Approx
 
 spec :: Spec
 spec = do
@@ -39,6 +41,7 @@ spec = do
                                  )
 
     describe "updateMatch" $ do
+        let ?epsilon = 0.01
         it "can move a player"
             $ let
                   player = PlayerWithBarrel (createPlayer (V2 48 350) 0 0) []
@@ -48,7 +51,7 @@ spec = do
                   moveEvent = createMoveRightEvent 0 50 (fromIntegral td)
                   new       = updateMatch [moveEvent] td old
               in
-                  getPlayerPosition (getFirstPlayer new) `shouldBe` (V2 98 350)
+                  getPlayerPosition (getFirstPlayer new) @?~ V2 98 350
         it "can create a shot"
             $ let
                   position  = V2 48 350
