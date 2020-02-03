@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 * Switched from using bmp images to embedded vector graphics for the textures
-* Changed to fullscreen mode
+* Changed to fullscreen mode and made the aspect ratio a litter wider
 
 ### Added
 * Limited amount of shots per second for each player

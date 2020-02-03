@@ -16,7 +16,6 @@ import           Data.Vector.Generic            ( thaw )
 import           Graphics.Text.TrueType         ( loadFontFile )
 import           System.FilePath                ( (</>) )
 
-windowSize' = V2 800 600
 frameInterval = 6944 -- this is smoother than 16667. Why is that? Since the
                      -- monitor refresh rate is 60 hz, 1/60 * 1000000 micro
                      -- seconds should be enough
@@ -25,7 +24,7 @@ main :: IO ()
 main = do
     initialize [InitJoystick, InitVideo]
     window <- createWindow "twinpin"
-                           defaultWindow { windowMode = FullscreenDesktop }
+                           defaultWindow { windowInitialSize = V2 882 496 }
     renderer <- createRenderer window (-1) defaultRenderer
     showWindow window
     joysticks <- availableJoysticks
