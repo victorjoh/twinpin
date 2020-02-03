@@ -24,7 +24,9 @@ main :: IO ()
 main = do
     initialize [InitJoystick, InitVideo]
     window <- createWindow "twinpin"
-                           defaultWindow { windowInitialSize = V2 882 496 }
+                        -- for screenshots
+                        -- defaultWindow { windowInitialSize = V2 882 496 }
+                           defaultWindow { windowMode = FullscreenDesktop }
     renderer <- createRenderer window (-1) defaultRenderer
     showWindow window
     joysticks <- availableJoysticks
