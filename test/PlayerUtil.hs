@@ -22,25 +22,25 @@ getPlayerPosition :: Player -> Position2D
 getPlayerPosition player = getCirclePosition $ playerToCircle player
 
 getPlayerAngle :: Player -> Angle2D
-getPlayerAngle (Player _ _ (Gun (Aim2D _ _ angle) _ _) _) = angle
+getPlayerAngle (Player _ _ (Gun (Aim2D _ _ angle) _ _) _ _) = angle
 
 getReloadTime :: Player -> ReloadTime
-getReloadTime (Player _ _ (Gun _ reloadTime _) _) = reloadTime
+getReloadTime (Player _ _ (Gun _ reloadTime _) _ _) = reloadTime
 
 getGun :: Player -> Gun
-getGun (Player _ _ gun _) = gun
+getGun (Player _ _ gun _ _) = gun
 
 getGunState :: Player -> GunState
 getGunState player = let (Gun _ _ gunState) = getGun player in gunState
 
 setReloadTime :: ReloadTime -> Player -> Player
 setReloadTime reloadTime player =
-    let Player _ _ (Gun aim _ state) _ = player
+    let Player _ _ (Gun aim _ state) _ _ = player
     in  setGun (Gun aim reloadTime state) player
 
 setPlayerVelocity :: Velocity2D -> Player -> Player
-setPlayerVelocity velocity (Player circle _ gun joystickId) =
-    Player circle velocity gun joystickId
+setPlayerVelocity velocity (Player circle _ gun playerId joystickId) =
+    Player circle velocity gun playerId joystickId
 
 getRequiredStickPosition :: Vector1D -> Time -> Integer
 getRequiredStickPosition distance time =
@@ -64,6 +64,9 @@ instance EventContent JoyHatEventData where
 
 instance EventContent KeyboardEventData where
     toEventPayload = KeyboardEvent
+
+instance EventContent JoyDeviceEventData where
+    toEventPayload = JoyDeviceEvent
 
 createMoveRightEvent :: JoystickID -> Vector1D -> Word32 -> Event
 createMoveRightEvent playerId distance time =
@@ -100,3 +103,6 @@ createButtonPressedEvent :: JoystickID -> ButtonID -> Event
 createButtonPressedEvent joystickId buttonId = Event
     0
     (JoyButtonEvent (JoyButtonEventData joystickId buttonId JoyButtonPressed))
+
+getJoystickId :: Player -> Maybe JoystickID
+getJoystickId (Player _ _ _ _ joystickId) = joystickId

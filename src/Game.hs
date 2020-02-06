@@ -7,6 +7,7 @@ module Game
     , updateGame
     , drawGame
     , isFinished
+    , assignJoysticks
     )
 where
 
@@ -14,6 +15,7 @@ import           Match
 import           Space
 import           Visual
 import           Menu
+import           SDL.Raw.Types                  ( JoystickID )
 import           SDL                     hiding ( Paused )
 import           Foreign.C.Types
 import           Graphics.Text.TrueType         ( Font )
@@ -40,8 +42,8 @@ acceptButtonId = 0
 
 boundsImageId = "bounds"
 
-createGame :: Game
-createGame = Game 0 $ Running createMatch
+createGame :: [JoystickID] -> Game
+createGame joystickIds = Game 0 $ Running $ createMatch joystickIds
 
 getStaticImages :: Font -> V2 CInt -> [(ImageId, Image PixelRGBA8)]
 getStaticImages font winSize =
@@ -160,6 +162,17 @@ runningEventToGameState (Running match) (Event _ (KeyboardEvent eventData)) =
 runningEventToGameState _ (Event _ (WindowClosedEvent _)) = Finished
 runningEventToGameState Finished _ = Finished
 runningEventToGameState previousState _ = previousState
+
+assignJoysticks :: [JoystickID] -> Game -> Game
+assignJoysticks newJoysticks (Game lastUpdatedTime state) =
+    Game lastUpdatedTime $ assignJoysticksToGameState newJoysticks state
+
+assignJoysticksToGameState :: [JoystickID] -> GameState -> GameState
+assignJoysticksToGameState newJoysticks (Running match) =
+    Running $ assignJoysticksToMatch newJoysticks match
+assignJoysticksToGameState newJoysticks (Paused match menu events) =
+    Paused (assignJoysticksToMatch newJoysticks match) menu events
+assignJoysticksToGameState _ Finished = Finished
 
 isFinished :: Game -> Bool
 isFinished (Game _ Finished) = True

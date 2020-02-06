@@ -1,5 +1,6 @@
 module Player
-    ( Player(..)
+    ( PlayerId(..)
+    , Player(..)
     , Gun(..)
     , GunState(..)
     , Aim2D(..)
@@ -16,6 +17,9 @@ module Player
     , playerToCircle
     , setGun
     , triggerMinFireValue
+    , getPlayerId
+    , hasJoystick
+    , setJoystickId
     )
 where
 
@@ -48,7 +52,9 @@ data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
 type ReloadTime = DeltaTime
 data GunState = Firing | Idle deriving (Show, Eq)
 data Gun = Gun Aim2D ReloadTime GunState deriving (Show, Eq)
-data Player = Player Circle Velocity2D Gun JoystickID deriving (Show, Eq)
+data PlayerId = Red | Blue deriving (Show, Eq, Ord, Enum)
+data Player = Player Circle Velocity2D Gun PlayerId (Maybe JoystickID)
+              deriving (Show, Eq)
 
 playerSide :: Size1D
 playerSide = 60
@@ -73,7 +79,7 @@ baseImageId = "playerBase"
 playerSize :: Size2D
 playerSize = V2 playerSide playerSide
 
-createPlayer :: Position2D -> Angle2D -> JoystickID -> Player
+createPlayer :: Position2D -> Angle2D -> PlayerId -> Maybe JoystickID -> Player
 createPlayer pos direction = Player (Circle pos (playerSide / 2))
                                     (V2 0 0)
                                     (Gun (Aim2D 0 0 direction) 0 Idle)
@@ -82,7 +88,7 @@ staticPlayerImage :: (ImageId, VectorImage)
 staticPlayerImage = (baseImageId, toSolidCircleImage baseColor playerRadius)
 
 drawPlayer :: Player -> [(Rectangle Float, Either VectorImage ImageId)]
-drawPlayer (Player shape _ gun joystickId) =
+drawPlayer (Player shape _ gun playerId _) =
     let Circle _ radius = shape
         Gun (Aim2D _ _ direction) reloadTime _ = gun
         center          = Rasterific.V2 radius radius
@@ -101,7 +107,7 @@ drawPlayer (Player shape _ gun joystickId) =
               $ VectorImage (V2 diameter diameter) transparent
               $ withTransformation (rotateCenter direction center)
               $ do
-                    withTexture (uniformTexture $ aimColor joystickId) aimShape
+                    withTexture (uniformTexture $ aimColor playerId) aimShape
                     withTexture (uniformTexture loadShadeColor) $ withClipping
                         (fill $ rectangle
                             (Rasterific.V2 (radius * 2 / 3) (radius * 2 / 3))
@@ -116,9 +122,9 @@ reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
 reloadTimeToAimShadowLength maxShadowWidth reloadTime =
     maxShadowWidth * fromIntegral reloadTime / fromIntegral minShotInterval
 
-aimColor :: JoystickID -> PixelRGBA8
-aimColor 0 = PixelRGBA8 0x5F 0x5F 0xD3 255
-aimColor _ = PixelRGBA8 0xD3 0x5F 0x5F 255
+aimColor :: PlayerId -> PixelRGBA8
+aimColor Red  = PixelRGBA8 0x5F 0x5F 0xD3 255
+aimColor Blue = PixelRGBA8 0xD3 0x5F 0x5F 255
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle
@@ -136,18 +142,37 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
 updatePlayer events dt obstacles player =
     let
-        Player shape velocity (Gun aim reloadTime state) joystickId = player
-        axisEvents =
-            map (joyAxisEventAxis &&& joyAxisEventValue)
-                $ filter ((joystickId ==) . joyAxisEventWhich)
-                $ mapMaybe toJoyAxis events
+        Player shape velocity gun playerId maybeJoystickId = player
+        Gun aim reloadTime state = gun
+        axisEvents               = case maybeJoystickId of
+            Just joystickId ->
+                map (joyAxisEventAxis &&& joyAxisEventValue)
+                    $ filter ((joystickId ==) . joyAxisEventWhich)
+                    $ mapMaybe toJoyAxis events
+            Nothing -> []
         newVelocity = foldl' updateVelocity velocity axisEvents
         newAim      = foldl' updateAim aim axisEvents
         newCircle =
             updateCollidingCirclePosition newVelocity dt obstacles shape
         newReloadTime = max 0 $ reloadTime - dt
     in
-        Player newCircle newVelocity (Gun newAim newReloadTime state) joystickId
+        Player newCircle
+               newVelocity
+               (Gun newAim newReloadTime state)
+               playerId
+               (updateJoystick events =<< maybeJoystickId)
+
+updateJoystick :: [Event] -> JoystickID -> Maybe JoystickID
+updateJoystick events joystickId = if hasJoystickRemovedEvent events joystickId
+    then Nothing
+    else Just joystickId
+
+hasJoystickRemovedEvent :: [Event] -> JoystickID -> Bool
+hasJoystickRemovedEvent events joystickId = any
+    ( (==) (JoyDeviceEvent $ JoyDeviceEventData JoyDeviceRemoved joystickId)
+    . eventPayload
+    )
+    events
 
 toJoyAxis :: Event -> Maybe JoyAxisEventData
 toJoyAxis (Event _ (JoyAxisEvent joyAxisEventData)) = Just joyAxisEventData
@@ -172,31 +197,32 @@ updateVelocity (V2 x y) (axisId, axisPos) =
 triggerShot :: [Event] -> Player -> (Player, Maybe Shot)
 triggerShot events player =
     let
-        Player (Circle position _) _ gun joystickId = player
-        Gun   aim reloadTime state     = gun
-        Aim2D _   _          direction = aim
-        newState                       = getGunState state joystickId events
+        Player (Circle position _) _ gun _ maybeJoystickId = player
+        Gun aim reloadTime state = gun
+        Aim2D _ _ direction = aim
+        newState = getGunState state maybeJoystickId events
         (newReloadTime, maybeShot) = if reloadTime == 0 && newState == Firing
             then (minShotInterval, Just $ createShot position direction)
             else (reloadTime, Nothing)
     in
         (setGun (Gun aim newReloadTime newState) player, maybeShot)
 
-getGunState :: GunState -> JoystickID -> [Event] -> GunState
-getGunState gunState joystickId =
-    foldl' seq gunState . mapMaybe (eventToGunState joystickId)
+getGunState :: GunState -> Maybe JoystickID -> [Event] -> GunState
+getGunState gunState (Just joystickId) events =
+    foldl' seq gunState $ mapMaybe (eventToGunState joystickId) events
+getGunState gunState Nothing _ = gunState
 
 eventToGunState :: JoystickID -> Event -> Maybe GunState
-eventToGunState playerId (Event _ (JoyAxisEvent axisEventData)) =
+eventToGunState playerJoystickId (Event _ (JoyAxisEvent axisEventData)) =
     let JoyAxisEventData joystickId buttonId amountPressed = axisEventData
-    in  if joystickId == playerId && buttonId == rightTriggerButtonId
+    in  if joystickId == playerJoystickId && buttonId == rightTriggerButtonId
             then if amountPressed > triggerMinFireValue
                 then Just Firing
                 else Just Idle
             else Nothing
-eventToGunState playerId (Event _ (JoyButtonEvent buttonEventData)) =
+eventToGunState playerJoystickId (Event _ (JoyButtonEvent buttonEventData)) =
     let JoyButtonEventData joystickId buttonId buttonState = buttonEventData
-    in  if joystickId == playerId && buttonId == rightBumberButtonId
+    in  if joystickId == playerJoystickId && buttonId == rightBumberButtonId
             then case buttonState of
                 JoyButtonPressed  -> Just Firing
                 JoyButtonReleased -> Just Idle
@@ -204,8 +230,18 @@ eventToGunState playerId (Event _ (JoyButtonEvent buttonEventData)) =
 eventToGunState _ _ = Nothing
 
 setGun :: Gun -> Player -> Player
-setGun gun (Player shape velocity _ joystickId) =
-    Player shape velocity gun joystickId
+setGun gun (Player shape velocity _ playerId joystickId) =
+    Player shape velocity gun playerId joystickId
 
 playerToCircle :: Player -> Circle
-playerToCircle (Player shape _ _ _) = shape
+playerToCircle (Player shape _ _ _ _) = shape
+
+getPlayerId :: Player -> PlayerId
+getPlayerId (Player _ _ _ playerId _) = playerId
+
+hasJoystick :: Player -> Bool
+hasJoystick (Player _ _ _ _ maybeJoystickId) = isJust maybeJoystickId
+
+setJoystickId :: JoystickID -> Player -> Player
+setJoystickId joystickId (Player shape velocity gun playerId _) =
+    Player shape velocity gun playerId $ Just joystickId

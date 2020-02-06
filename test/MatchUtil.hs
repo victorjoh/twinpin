@@ -7,6 +7,10 @@ import           Shot
 getFirstPlayerWithBarrel :: Match -> PlayerWithBarrel
 getFirstPlayerWithBarrel (Match (Movables _ players) _) = head players
 
+getPlayers :: Match -> [Player]
+getPlayers (Match (Movables _ playersWithBarrels) _) =
+    map toPlayer playersWithBarrels
+
 toPlayer :: PlayerWithBarrel -> Player
 toPlayer (PlayerWithBarrel player _) = player
 

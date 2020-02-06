@@ -17,14 +17,14 @@ spec :: Spec
 spec = do
     describe "createMatch"
         $ it "creates two players opposite of each other"
-        $ let Match (Movables _ players) _ = createMatch
+        $ let Match (Movables _ players) _ = createMatch []
               angles = map (getPlayerAngle . toPlayer) players
               angle1 : angle2 : _ = angles
           in  abs (angleDifference2D angle1 angle2) `shouldBe` pi
 
     describe "drawMatch"
         $ it "converts from match to something that can be drawn by SDL"
-        $ let player           = createPlayer (V2 48 350) 0 0
+        $ let player           = createPlayer (V2 48 350) 0 Red Nothing
               playerWithBarrel = PlayerWithBarrel player []
               shot             = createShot (V2 100 200) 0
               pillar           = Circle (V2 60 70) 48
@@ -44,9 +44,11 @@ spec = do
         let ?epsilon = 0.01
         it "can move a player"
             $ let
-                  player = PlayerWithBarrel (createPlayer (V2 48 350) 0 0) []
-                  old    = Match (Movables [] [player])
-                                 (Obstacles (createBounds 800 600) [])
+                  player = PlayerWithBarrel
+                      (createPlayer (V2 48 350) 0 Red (Just 0))
+                      []
+                  old = Match (Movables [] [player])
+                              (Obstacles (createBounds 800 600) [])
                   td        = 200
                   moveEvent = createMoveRightEvent 0 50 (fromIntegral td)
                   new       = updateMatch [moveEvent] td old
@@ -56,8 +58,9 @@ spec = do
             $ let
                   position  = V2 48 350
                   direction = 45
-                  player =
-                      PlayerWithBarrel (createPlayer position direction 0) []
+                  player    = PlayerWithBarrel
+                      (createPlayer position direction Red (Just 0))
+                      []
                   old = Match (Movables [] [player])
                               (Obstacles (createBounds 800 600) [])
                   triggerPressed = createTriggerEvent 0 JoyButtonPressed
@@ -66,9 +69,11 @@ spec = do
                   getFirstBarrel new `shouldBe` [createShot position direction]
         it "cannot create 2 shots from the same player in rapid succession"
             $ let
-                  player = PlayerWithBarrel (createPlayer (V2 48 350) 45 0) []
-                  old    = Match (Movables [] [player])
-                                 (Obstacles (createBounds 800 600) [])
+                  player = PlayerWithBarrel
+                      (createPlayer (V2 48 350) 45 Red (Just 0))
+                      []
+                  old = Match (Movables [] [player])
+                              (Obstacles (createBounds 800 600) [])
                   triggerPressed = createTriggerEvent 0 JoyButtonPressed
                   between        = updateMatch [triggerPressed] 1 old
                   new            = updateMatch [triggerPressed] 1 between
@@ -96,9 +101,11 @@ spec = do
         it "changes color of shots that hit players"
             $ let
                   shot   = createShot (V2 100 300) 0
-                  player = PlayerWithBarrel (createPlayer (V2 200 300) 0 0) []
-                  old    = Match (Movables [shot] [player])
-                                 (Obstacles (createBounds 800 600) [])
+                  player = PlayerWithBarrel
+                      (createPlayer (V2 200 300) 0 Red Nothing)
+                      []
+                  old = Match (Movables [shot] [player])
+                              (Obstacles (createBounds 800 600) [])
                   new = updateMatch [] (getShotMovementTime 100) old
               in
                   map getShotState (getShots new) `shouldBe` [HasHitPlayer]
@@ -106,24 +113,24 @@ spec = do
                 (  "changes color of shots that hit players even though they"
                 ++ " haven't left the barrel of the player triggering the shot"
                 )
-            $ let
-                  shot = createShot (V2 400 300) 0
-                  sourcePlayer =
-                      PlayerWithBarrel (createPlayer (V2 400 300) 0 0) [shot]
+            $ let shot         = createShot (V2 400 300) 0
+                  sourcePlayer = PlayerWithBarrel
+                      (createPlayer (V2 400 300) 0 Red Nothing)
+                      [shot]
                   targetPlayer = PlayerWithBarrel
-                      (createPlayer (V2 (400 + playerSide) 300) 0 0)
+                      (createPlayer (V2 (400 + playerSide) 300) 0 Blue Nothing)
                       []
                   old = Match (Movables [] [sourcePlayer, targetPlayer])
                               (Obstacles (createBounds 800 600) [])
                   new = updateMatch [] (getShotMovementTime playerRadius) old
-              in
-                  map getShotState (getFirstBarrel new)
+              in  map getShotState (getFirstBarrel new)
                       `shouldBe` [HasHitPlayer]
         it "can collide two players"
             $ let
-                  player1 = PlayerWithBarrel (createPlayer (V2 100 300) 0 0) []
-                  player2 = PlayerWithBarrel (createPlayer (V2 200 300) 0 1) []
-                  old     = Match (Movables [] [player1, player2])
+                  player1 = createPlayer (V2 100 300) 0 Red (Just 0)
+                  player2 = createPlayer (V2 200 300) 0 Blue Nothing
+                  players = [ PlayerWithBarrel p [] | p <- [player1, player2] ]
+                  old     = Match (Movables [] players)
                                   (Obstacles (createBounds 800 600) [])
                   td = 1000
                   movePlayer1Right =
@@ -133,17 +140,13 @@ spec = do
                   getPlayerPosition (getFirstPlayer new)
                       `shouldBe` (V2 (200 - playerSide) 300)
         it "can collide a player with a pillar"
-            $ let
-                  player       = createPlayer (V2 100 300) 0 0
+            $ let player       = createPlayer (V2 100 300) 0 Red (Just 0)
                   pillarRadius = 48
                   pillar       = Circle (V2 200 300) pillarRadius
                   old = Match (Movables [] [PlayerWithBarrel player []])
                               (Obstacles (createBounds 800 600) [pillar])
-                  new = updateMatch [(createMoveRightEvent 0 200 1000)]
-                                    1000
-                                    old
-              in
-                  getPlayerPosition (getFirstPlayer new)
+                  new = updateMatch [createMoveRightEvent 0 200 1000] 1000 old
+              in  getPlayerPosition (getFirstPlayer new)
                       `shouldBe` (V2 (200 - pillarRadius - playerRadius) 300)
         it "removes a shot that has hit a pillar"
             $ let pillar = Circle (V2 200 300) 48
@@ -153,3 +156,32 @@ spec = do
                                 -- removed because it is outside the bounds
                       (Obstacles (createBounds 100000 600) [pillar])
               in  getShots (updateMatch [] 1000 old) `shouldBe` []
+
+    describe "assignJoysticksToMatch" $ do
+        let
+            updateWith oldJoysticks addedJoysticks =
+                let
+                    players = map
+                        (flip PlayerWithBarrel [] . createPlayer (V2 0 0) 0 Red)
+                        oldJoysticks
+                    match = Match (Movables [] players)
+                                  (Obstacles (createBounds 0 0) [])
+                in
+                    map getJoystickId $ getPlayers $ assignJoysticksToMatch
+                        addedJoysticks
+                        match
+        it "does nothing with an empty list"
+            $          updateWith [Just 0, Nothing] []
+            `shouldBe` [Just 0, Nothing]
+        it "does nothing if all the player already has joysticks assigned"
+            $          updateWith [Just 0, Just 1] [5]
+            `shouldBe` [Just 0, Just 1]
+        it "assigns a joystick to a player missing one"
+            $          updateWith [Just 0, Nothing] [5]
+            `shouldBe` [Just 0, Just 5]
+        it "only assigns as many joysticks as provided"
+            $          updateWith [Nothing, Nothing, Nothing] [3, 5]
+            `shouldBe` [Just 3, Just 5, Nothing]
+        it "only assigns to those that does not already have a joystick"
+            $          updateWith [Just 1, Nothing, Just 2, Nothing] [3, 4]
+            `shouldBe` [Just 1, Just 3, Just 2, Just 4]

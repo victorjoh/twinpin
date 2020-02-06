@@ -25,8 +25,8 @@ spec = do
 
     describe "createGame"
         $          it "creates a game in a running state"
-        $          createGame
-        `shouldBe` Game 0 (Running createMatch)
+        $          createGame [0, 1]
+        `shouldBe` Game 0 (Running $ createMatch [0, 1])
 
     describe "drawGame" $ do
         it "draws a match when running"
@@ -72,7 +72,7 @@ spec = do
     describe "updateGame" $ do
         let ?epsilon = 0.01
         it "is not finished when the user has not closed the window"
-            $               updateGame [] 50 createGame
+            $               updateGame [] 50 (createGame [])
             `shouldSatisfy` (not . isFinished)
         it "is finished when the user closes the window"
             $ let closedEvent = Event
@@ -80,7 +80,7 @@ spec = do
                       (WindowClosedEvent
                           (WindowClosedEventData (Window nullPtr))
                       )
-              in  updateGame [closedEvent] 1 createGame
+              in  updateGame [closedEvent] 1 (createGame [0])
                       `shouldSatisfy` isFinished
         it "updates the match with how much time has passed since last update"
             $ let
@@ -160,7 +160,7 @@ spec = do
                 ++ "resuming the match"
                 )
             $ let
-                  player = createPlayer (V2 100 300) 0 0
+                  player = createPlayer (V2 100 300) 0 Red (Just 0)
                   match  = Match (Movables [] [PlayerWithBarrel player []])
                                  (Obstacles (createBounds 1920 1080) [])
                   game              = Game 0 $ Paused match Resume []
@@ -179,7 +179,7 @@ spec = do
                 ++ "when resuming the match"
                 )
             $ let
-                  player = createPlayer (V2 100 300) 0 0
+                  player = createPlayer (V2 100 300) 0 Red (Just 0)
                   shotsToMatch shots = Match
                       (Movables shots [PlayerWithBarrel player []])
                       (Obstacles (createBounds 1920 1080) [])
@@ -199,7 +199,7 @@ spec = do
                 ++ "the game is paused"
                 )
             $ let
-                  player = createPlayer (V2 100 300) 0 0
+                  player = createPlayer (V2 100 300) 0 Red (Just 0)
                   match  = Match (Movables [] [PlayerWithBarrel player []])
                                  (Obstacles (createBounds 1920 1080) [])
                   game              = Game 0 $ Paused match Resume []
@@ -228,3 +228,19 @@ spec = do
                                          Resume
                                          [moveDown, moveUp]
                                      )
+
+    describe "assignJoysticks" $ do
+        let player = PlayerWithBarrel (createPlayer (V2 0 0) 0 Red Nothing) []
+            match =
+                Match (Movables [] [player]) (Obstacles (createBounds 0 0) [])
+        it "assigns joysticks to the match when running"
+            $ let game                      = Game 0 $ Running match
+                  Game _ (Running newMatch) = assignJoysticks [1] game
+              in  getJoystickId (getFirstPlayer newMatch) `shouldBe` Just 1
+        it "assigns joysticks to the match when paused"
+            $ let game                         = Game 0 $ Paused match Resume []
+                  Game _ (Paused newMatch _ _) = assignJoysticks [1] game
+              in  getJoystickId (getFirstPlayer newMatch) `shouldBe` Just 1
+        it "does nothing when the game is already finished"
+            $          assignJoysticks [1] (Game 0 Finished)
+            `shouldBe` Game 0 Finished

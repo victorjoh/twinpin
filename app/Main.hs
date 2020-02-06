@@ -3,18 +3,30 @@
 module Main where
 
 import           SDL
+import           SDL.Raw.Types                  ( JoystickID )
 import           Codec.Picture.Types
 import           Control.Concurrent             ( threadDelay )
 import           Game
-import           Visual                         ( backgroundColorSDL )
+import           Visual                         ( ImageId
+                                                , backgroundColorSDL
+                                                )
+import           Space                          ( Time
+                                                , DeltaTime
+                                                )
 import           Foreign.C.Types                ( CInt )
 import qualified Data.Map.Strict               as Map
-import           Data.Maybe                     ( fromJust )
-import           Control.Monad                  ( unless )
+import           Data.Maybe                     ( fromJust
+                                                , mapMaybe
+                                                )
+import           Control.Monad                  ( unless
+                                                , (<=<)
+                                                )
 import           Codec.Picture                  ( PixelRGBA8(..) )
 import           Data.Vector.Generic            ( thaw )
 import           Graphics.Text.TrueType         ( loadFontFile )
 import           System.FilePath                ( (</>) )
+import           Data.List                      ( nub )
+import qualified Data.Vector                   as Vector
 
 frameInterval = 6944 -- this is smoother than 16667. Why is that? Since the
                      -- monitor refresh rate is 60 hz, 1/60 * 1000000 micro
@@ -29,43 +41,63 @@ main = do
                            defaultWindow { windowMode = FullscreenDesktop }
     renderer <- createRenderer window (-1) defaultRenderer
     showWindow window
-    joysticks <- availableJoysticks
-    mapM_ openJoystick joysticks
     font <- either fail return
         =<< loadFontFile ("fonts" </> "Aller" </> "Aller_Rg.ttf")
-    winSize    <- get $ windowSize window
-    textureMap <- mapM (toTexture renderer)
-                       (Map.fromList $ getStaticImages font winSize)
-    gameLoop renderer textureMap winSize createGame
-    mapM_ destroyTexture textureMap
+    winSize             <- get $ windowSize window
+    preRenderedTextures <- mapM
+        (toTexture renderer)
+        (Map.fromList $ getStaticImages font winSize)
+    joystickIds <- openJoysticks =<< Vector.toList <$> availableJoysticks
+    gameLoop renderer preRenderedTextures winSize $ createGame joystickIds
+    mapM_ destroyTexture preRenderedTextures
 
-gameLoop :: Renderer -> Map.Map String Texture -> V2 CInt -> Game -> IO ()
-gameLoop renderer textureMap winSize game = do
-    currentTime <- fromIntegral <$> ticks
-    events      <- pollEvents
+gameLoop :: Renderer -> Map.Map ImageId Texture -> V2 CInt -> Game -> IO ()
+gameLoop renderer preRenderedTextures winSize game = do
+    updateTime <- currentTime
+    events     <- pollEvents
     -- unless (null events) $ print events
-    let newGame = updateGame events currentTime game
-    rendererDrawColor renderer $= backgroundColorSDL
-    clear renderer
-    mapM_ (draw renderer textureMap) $ drawGame winSize newGame
-    present renderer
-    timeSpent <- fmap (flip (-) currentTime . fromIntegral) ticks
+    let updatedGame = updateGame events updateTime game
+    showFrame renderer preRenderedTextures $ drawGame winSize updatedGame
+    addedJoysticks <- openJoysticks $ getAddedDevices events
+    let newGame = assignJoysticks addedJoysticks updatedGame
+    timeSpent <- currentTime `timeDifference` updateTime
     threadDelay $ frameInterval - timeSpent
-    unless (isFinished newGame) (gameLoop renderer textureMap winSize newGame)
+    unless (isFinished newGame)
+        $ gameLoop renderer preRenderedTextures winSize newGame
 
-draw
+showFrame
     :: Renderer
     -> Map.Map String Texture
-    -> (Rectangle CInt, Either (Image PixelRGBA8) String)
+    -> [(Rectangle CInt, Either (Image PixelRGBA8) ImageId)]
     -> IO ()
-draw renderer textureMap (destination, generatedOrStatic) = either
-    (\image -> do
-        texture <- toTexture renderer image
-        drawInWindow texture
-        destroyTexture texture
-    )
-    (\imageId -> drawInWindow $ fromJust $ Map.lookup imageId textureMap)
-    generatedOrStatic
+showFrame renderer preRenderedTextures images = do
+    rendererDrawColor renderer $= backgroundColorSDL
+    clear renderer
+    mapM_ (showImage renderer preRenderedTextures) images
+    present renderer
+
+currentTime :: IO Time
+currentTime = fromIntegral <$> ticks
+
+timeDifference :: IO Time -> Time -> IO DeltaTime
+timeDifference current previous = flip (-) previous <$> current
+
+showImage
+    :: Renderer
+    -> Map.Map String Texture
+    -> (Rectangle CInt, Either (Image PixelRGBA8) ImageId)
+    -> IO ()
+showImage renderer preRenderedTextures (destination, generatedOrStatic) =
+    either
+        (\image -> do
+            texture <- toTexture renderer image
+            drawInWindow texture
+            destroyTexture texture
+        )
+        (\imageId ->
+            drawInWindow $ fromJust $ Map.lookup imageId preRenderedTextures
+        )
+        generatedOrStatic
   where
     drawInWindow tex =
         copyEx renderer tex Nothing (Just destination) 0 Nothing
@@ -84,3 +116,15 @@ toTexture renderer image = do
     texture       <- createTextureFromSurface renderer surface
     freeSurface surface
     return texture
+
+getAddedDevices :: [Event] -> [JoystickDevice]
+getAddedDevices events = nub $ mapMaybe addedEventToJoystickDevice events
+  where
+    addedEventToJoystickDevice (Event _ payload) = case payload of
+        JoyDeviceEvent (JoyDeviceEventData JoyDeviceAdded deviceId) ->
+            Just $ JoystickDevice "" (fromIntegral deviceId)
+        _ -> Nothing
+
+-- TODO: do this in a different thread since openJoystick takes a lot of time
+openJoysticks :: [JoystickDevice] -> IO [JoystickID]
+openJoysticks = mapM $ getJoystickID <=< openJoystick

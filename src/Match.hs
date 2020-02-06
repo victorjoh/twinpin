@@ -11,6 +11,7 @@ module Match
     , staticMatchImages
     , drawMatch
     , updateMatch
+    , assignJoysticksToMatch
     )
 where
 
@@ -27,6 +28,8 @@ import           Data.List                      ( delete
                                                 , partition
                                                 , foldl'
                                                 )
+import           SDL.Raw.Types                  ( JoystickID )
+import           Relude.List                    ( (!!?) )
 
 -- The barrel contains shots that still haven't left the player after firing.
 -- These are separated from other shots to make sure that the player isn't
@@ -57,20 +60,22 @@ matchSize = V2 width height
 width = 1920
 height = 1080
 
-createMatch :: Match
-createMatch =
+createMatch :: [JoystickID] -> Match
+createMatch joystickIds =
     let
         bounds            = createBounds width height
         xDistanceFromEdge = playerSide + playerSide / 2
-        createPlayer' x direction playerId = PlayerWithBarrel
-            (createPlayer (V2 x (height / 2)) direction playerId)
-            []
+        createPlayer' x dir playerId =
+            let joyId = joystickIds !!? fromEnum playerId
+            in  PlayerWithBarrel
+                    (createPlayer (V2 x (height / 2)) dir playerId joyId)
+                    []
     in
         Match
             (Movables
                 []
-                [ createPlayer' xDistanceFromEdge           0  0
-                , createPlayer' (width - xDistanceFromEdge) pi 1
+                [ createPlayer' xDistanceFromEdge           0  Red
+                , createPlayer' (width - xDistanceFromEdge) pi Blue
                 ]
             )
             (Obstacles bounds $ createPillars width height)
@@ -223,3 +228,17 @@ mapPlayer f (PlayerWithBarrel player barrel) =
 mapBarrel :: ([Shot] -> [Shot]) -> PlayerWithBarrel -> PlayerWithBarrel
 mapBarrel f (PlayerWithBarrel player barrel) =
     PlayerWithBarrel player $ f barrel
+
+assignJoysticksToMatch :: [JoystickID] -> Match -> Match
+assignJoysticksToMatch newJoysticks (Match movables obstacles) =
+    let Movables shots players = movables
+        newPlayers             = assignJoysticksToPlayers newJoysticks players
+    in  Match (Movables shots newPlayers) obstacles
+
+assignJoysticksToPlayers
+    :: [JoystickID] -> [PlayerWithBarrel] -> [PlayerWithBarrel]
+assignJoysticksToPlayers _        []       = []
+assignJoysticksToPlayers []       ps       = ps
+assignJoysticksToPlayers (j : js) (p : ps) = if hasJoystick (getPlayer p)
+    then p : assignJoysticksToPlayers (j : js) ps
+    else mapPlayer (setJoystickId j) p : assignJoysticksToPlayers js ps
