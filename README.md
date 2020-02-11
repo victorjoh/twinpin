@@ -1,10 +1,10 @@
-# twinpin
+# Twinpin
 ![twinpin screenshot](doc/screenshot.png "twinpin screenshot")
 
-twinpin is a minimal twin-stick shooter. The two players control their
-characters with gamepads. So far I have only tried it with a Sony DualShock 4
-V2. I develop this game to satisfy my functional programming itch. To play,
-either download [the latest
+Twinpin is a minimalistic top-down twin-stick shooter. Each player controls a
+circle with their gamepad. Only Sony DualShock 4 V2 are supported so far but
+others gamepad have been reported to work as well. I develop this game to
+satisfy my functional programming itch. To play, either download [the latest
 release](https://github.com/victorjoh/twinpin/releases/latest), or build from
 source by following the instructions below.
 
