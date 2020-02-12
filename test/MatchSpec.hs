@@ -17,7 +17,7 @@ spec :: Spec
 spec = do
     describe "createMatch"
         $ it "creates two players opposite of each other"
-        $ let Match (Movables _ players) _ = createMatch []
+        $ let Match (Movables _ players) _ = createMatch
               angles = map (getPlayerAngle . toPlayer) players
               angle1 : angle2 : _ = angles
           in  abs (angleDifference2D angle1 angle2) `shouldBe` pi

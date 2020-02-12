@@ -26,7 +26,6 @@ import           Data.Vector.Generic            ( thaw )
 import           Graphics.Text.TrueType         ( loadFontFile )
 import           System.FilePath                ( (</>) )
 import           Data.List                      ( nub )
-import qualified Data.Vector                   as Vector
 
 frameInterval = 6944 -- this is smoother than 16667. Why is that? Since the
                      -- monitor refresh rate is 60 hz, 1/60 * 1000000 micro
@@ -47,8 +46,7 @@ main = do
     preRenderedTextures <- mapM
         (toTexture renderer)
         (Map.fromList $ getStaticImages font winSize)
-    joystickIds <- openJoysticks =<< Vector.toList <$> availableJoysticks
-    gameLoop renderer preRenderedTextures winSize $ createGame joystickIds
+    gameLoop renderer preRenderedTextures winSize createGame
     mapM_ destroyTexture preRenderedTextures
 
 gameLoop :: Renderer -> Map.Map ImageId Texture -> V2 CInt -> Game -> IO ()

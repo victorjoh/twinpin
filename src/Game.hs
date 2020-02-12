@@ -42,8 +42,8 @@ acceptButtonId = 0
 
 boundsImageId = "bounds"
 
-createGame :: [JoystickID] -> Game
-createGame joystickIds = Game 0 $ Running $ createMatch joystickIds
+createGame :: Game
+createGame = Game 0 $ Running createMatch
 
 getStaticImages :: Font -> V2 CInt -> [(ImageId, Image PixelRGBA8)]
 getStaticImages font winSize =

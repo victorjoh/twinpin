@@ -29,7 +29,6 @@ import           Data.List                      ( delete
                                                 , foldl'
                                                 )
 import           SDL.Raw.Types                  ( JoystickID )
-import           Relude.List                    ( (!!?) )
 
 -- The barrel contains shots that still haven't left the player after firing.
 -- These are separated from other shots to make sure that the player isn't
@@ -60,16 +59,14 @@ matchSize = V2 width height
 width = 1920
 height = 1080
 
-createMatch :: [JoystickID] -> Match
-createMatch joystickIds =
+createMatch :: Match
+createMatch =
     let
         bounds            = createBounds width height
         xDistanceFromEdge = playerSide + playerSide / 2
-        createPlayer' x dir playerId =
-            let joyId = joystickIds !!? fromEnum playerId
-            in  PlayerWithBarrel
-                    (createPlayer (V2 x (height / 2)) dir playerId joyId)
-                    []
+        createPlayer' x dir playerId = PlayerWithBarrel
+            (createPlayer (V2 x (height / 2)) dir playerId Nothing)
+            []
     in
         Match
             (Movables

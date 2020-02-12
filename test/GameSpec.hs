@@ -25,8 +25,8 @@ spec = do
 
     describe "createGame"
         $          it "creates a game in a running state"
-        $          createGame [0, 1]
-        `shouldBe` Game 0 (Running $ createMatch [0, 1])
+        $          createGame
+        `shouldBe` Game 0 (Running createMatch)
 
     describe "drawGame" $ do
         it "draws a match when running"
@@ -72,7 +72,7 @@ spec = do
     describe "updateGame" $ do
         let ?epsilon = 0.01
         it "is not finished when the user has not closed the window"
-            $               updateGame [] 50 (createGame [])
+            $               updateGame [] 50 createGame
             `shouldSatisfy` (not . isFinished)
         it "is finished when the user closes the window"
             $ let closedEvent = Event
@@ -80,7 +80,7 @@ spec = do
                       (WindowClosedEvent
                           (WindowClosedEventData (Window nullPtr))
                       )
-              in  updateGame [closedEvent] 1 (createGame [0])
+              in  updateGame [closedEvent] 1 (assignJoysticks [0] createGame)
                       `shouldSatisfy` isFinished
         it "updates the match with how much time has passed since last update"
             $ let
