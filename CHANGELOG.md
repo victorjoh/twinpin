@@ -11,6 +11,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 * Gamepads connected after the game started can now be used. The same goes for
   reconnected gamepads.
 
+### Fixed
+* When a player is wedged between a pillar and an other player, it can now
+  properly slide off the other player when moving.
+
 ## [0.2.0] - 2020-02-03
 ### Changed
 * Switched from using bmp images to embedded vector graphics for the textures

@@ -262,9 +262,9 @@ spec = do
                            (Circle (V2 81.89259 157.61285) 16.0)
             `shouldBe` Circle (V2 81.62088 158.31242) 16.0
         it
-                (  "lets the circle slide off one of the circles when it is"
-                ++ " wedged between two other circles (of different sizes)"
-                ++ " given that the movement direction is right"
+                (  "lets the circle slide off one of two circles (of different"
+                ++ " sizes) when it is wedged between them given that the"
+                ++ " movement direction is right (1)"
                 )
             $          updateCollidingCirclePosition
                            (V2 (-0.32768) 0)
@@ -277,3 +277,19 @@ spec = do
                            )
                            (Circle (V2 81.83336 171.7412) 16.0)
             `shouldBe` Circle (V2 76.58978 174.33987) 16.0
+        it
+                (  "lets the circle slide off one of two circles (of different"
+                ++ " sizes) when it is wedged between them given that the"
+                ++ " movement direction is right (2)"
+                )
+            $          updateCollidingCirclePosition
+                           (V2 (-0.51724803) 0.46882802)
+                           15
+                           (Obstacles
+                               (Bounds2D (0.0, 1920.0) (0.0, 1080.0))
+                               [ Circle (V2 266.0 266.0) 86.0
+                               , Circle (V2 266.0 432.0) 30.0
+                               ]
+                           )
+                           (Circle (V2 238.4737 378.68674) 30.0)
+            `shouldBe` Circle (V2 229.91446 384.06427) 30.0

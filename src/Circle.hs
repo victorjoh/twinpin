@@ -32,8 +32,9 @@ import           Relude.Extra.Tuple             ( traverseToFst )
 type Radius = Float
 type Diameter = Float
 data Circle = Circle Position2D Radius deriving (Show, Eq)
-data Waypoint = Waypoint Position2D WaypointType
+data Waypoint = Waypoint Position2D WaypointType deriving (Show)
 data WaypointType = CircleCollision Circle | BoundsCollision | MovementFinished
+                    deriving (Show)
 data Obstacles = Obstacles Bounds2D [Circle] deriving (Show, Eq)
 
 class Show m => Movement m where
@@ -319,7 +320,7 @@ instance Movement CircularMovement where
     collideWithCircles radiusInMotion movement obstacles =
         fmap
                 ( pairToWaypoint
-                . bimap (+ trajectoryCenter) (flip (+@) trajectoryCenter)
+                . bimap (+ trajectoryCenter) (+@ trajectoryCenter)
                 . second (decreaseRadius radiusInMotion)
                 )
             $ foldr (getClosestCircleCollision current') Nothing
@@ -327,6 +328,11 @@ instance Movement CircularMovement where
                   (traverseToFst $ getCircleCircleIntersections trajectoryRadius
                   )
             $ map (increaseRadius radiusInMotion)
+            $ filter
+                  (not . hasPositionInQuadrant
+                      current'
+                      (getPerpendicularTo current' (-startDirection))
+                  )
             $ filter
                   (hasAreaOnSide (getLine2D current' trajectoryCenter')
                                  startDirection
@@ -347,6 +353,13 @@ getClosestBoundsCollision
 getClosestBoundsCollision _ collision Nothing = Just collision
 getClosestBoundsCollision reference p1 (Just p2) =
     if distance reference p1 < distance reference p2 then Just p1 else Just p2
+
+getPerpendicularTo :: Vector2D -> Vector2D -> Vector2D
+getPerpendicularTo (V2 x y) = flipToClosest (V2 y (-x))
+
+hasPositionInQuadrant :: Vector2D -> Vector2D -> Circle -> Bool
+hasPositionInQuadrant v1 v2 (Circle pos _) =
+    pos `dot` v1 > 0 && pos `dot` v2 > 0
 
 hasAreaOnSide :: Line2D -> Vector2D -> Circle -> Bool
 hasAreaOnSide l side (Circle pos r) =
