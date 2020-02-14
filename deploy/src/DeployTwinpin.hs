@@ -29,7 +29,7 @@ import           Unsafe.Coerce
 import           Data.List.Split                ( splitOn )
 import           Data.List                      ( find )
 
-twinpinVersion = "0.2.1"
+twinpinVersion = "0.2.2"
 licenseFile = "LICENSE"
 buildExeName = "twinpin-exe"
 deployExeName = "twinpin"
