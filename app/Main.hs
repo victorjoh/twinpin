@@ -27,9 +27,8 @@ import           Graphics.Text.TrueType         ( loadFontFile )
 import           System.FilePath                ( (</>) )
 import           Data.List                      ( nub )
 
-frameInterval = 6944 -- this is smoother than 16667. Why is that? Since the
-                     -- monitor refresh rate is 60 hz, 1/60 * 1000000 micro
-                     -- seconds should be enough
+maxFps = 60
+frameInterval = round $ 1000000 / maxFps -- microseconds
 
 main :: IO ()
 main = do
@@ -54,12 +53,13 @@ gameLoop renderer preRenderedTextures winSize game = do
     updateTime <- currentTime
     events     <- pollEvents
     -- unless (null events) $ print events
+    -- printFps lastTime updateTime
     let updatedGame = updateGame events updateTime game
     showFrame renderer preRenderedTextures $ drawGame winSize updatedGame
     addedJoysticks <- openJoysticks $ getAddedDevices events
     let newGame = assignJoysticks addedJoysticks updatedGame
     timeSpent <- currentTime `timeDifference` updateTime
-    threadDelay $ frameInterval - timeSpent
+    threadDelay $ frameInterval - (timeSpent * 1000)
     unless (isFinished newGame)
         $ gameLoop renderer preRenderedTextures winSize newGame
 
@@ -74,6 +74,7 @@ showFrame renderer preRenderedTextures images = do
     mapM_ (showImage renderer preRenderedTextures) images
     present renderer
 
+-- time since game start in milliseconds
 currentTime :: IO Time
 currentTime = fromIntegral <$> ticks
 
@@ -126,3 +127,16 @@ getAddedDevices events = nub $ mapMaybe addedEventToJoystickDevice events
 -- TODO: do this in a different thread since openJoystick takes a lot of time
 openJoysticks :: [JoystickDevice] -> IO [JoystickID]
 openJoysticks = mapM $ getJoystickID <=< openJoystick
+
+printFps :: Time -> Time -> IO ()
+printFps prev curr =
+    let diff = curr - prev
+        fps  = round $ 1000 / fromIntegral diff
+    in  putStrLn
+            $  "time: "
+            ++ show curr
+            ++ " ms\t\tinterval: "
+            ++ show diff
+            ++ " ms\t\tfps: "
+            ++ show fps
+            ++ " Hz"

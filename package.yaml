@@ -39,6 +39,7 @@ library:
   ghc-options:
   - -W
   - -Wname-shadowing
+  - -O2
   dependencies:
   - sdl2
   - containers
@@ -61,6 +62,7 @@ executables:
     - -with-rtsopts=-N
     - -W
     - -Wname-shadowing
+    - -O2
     dependencies:
     - twinpin
     - sdl2
