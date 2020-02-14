@@ -2,4 +2,5 @@
 .stack-work/
 twinpin.cabal
 fonts/
+*.prof
 *~
