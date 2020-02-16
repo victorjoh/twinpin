@@ -16,10 +16,10 @@ spec = do
             `shouldBe` Rectangle (P $ V2 690 333) (V2 540 414)
         it "can draw the selection when Resume is selected"
             $          fst (last $ drawMenu Resume)
-            `shouldBe` fst (drawShot $ createShot (V2 807 540) 0)
+            `shouldBe` fst (drawShot $ createShot (V2 807 540) 0 (-1))
         it "can draw the selection when Quit is selected"
             $          fst (last $ drawMenu Quit)
-            `shouldBe` fst (drawShot $ createShot (V2 807 630) 0)
+            `shouldBe` fst (drawShot $ createShot (V2 807 630) 0 (-1))
 
     describe "updateMenu" $ do
         it "moves the selection down when the left thumbstick is moved down"

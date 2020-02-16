@@ -54,7 +54,7 @@ toSolidCircleImage color radius =
         $ toDrawing radius
     where diameter = toDiameter radius
 
-toDrawing :: Radius -> Drawing PixelRGBA8 ()
+toDrawing :: Radius -> Drawing px ()
 toDrawing radius = fill $ circle (Rasterific.V2 radius radius) radius
 
 toDiameter :: Radius -> Diameter

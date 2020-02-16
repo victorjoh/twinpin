@@ -35,7 +35,7 @@ drawMenu :: Menu -> [(Rectangle Float, Either VectorImage ImageId)]
 drawMenu menu =
     let selectionPosition = if menu == Resume then 540 else 630
     in  [ (Rectangle (P $ V2 690 333) menuSize, Right menuImageId)
-        , drawShot $ createShot (V2 807 selectionPosition) 0
+        , drawShot $ createShot (V2 807 selectionPosition) 0 (-1)
         ]
 
 updateMenu :: [Event] -> Menu -> Menu

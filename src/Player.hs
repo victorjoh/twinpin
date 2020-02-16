@@ -4,6 +4,7 @@ module Player
     , Gun(..)
     , GunState(..)
     , Aim2D(..)
+    , playerMaxHealth
     , ReloadTime
     , playerSide
     , minShotInterval
@@ -20,6 +21,9 @@ module Player
     , getPlayerId
     , hasJoystick
     , setJoystickId
+    , squareSector
+    , scaleAndOffset
+    , inflictDamage
     )
 where
 
@@ -29,7 +33,7 @@ import           Circle
 import           Visual
 import           SDL
 import           Graphics.Rasterific     hiding ( V2(..) )
-import qualified Graphics.Rasterific           as Rasterific
+import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
 import           Graphics.Rasterific.Texture
 import           Graphics.Rasterific.Transformations
@@ -53,8 +57,11 @@ type ReloadTime = DeltaTime
 data GunState = Firing | Idle deriving (Show, Eq)
 data Gun = Gun Aim2D ReloadTime GunState deriving (Show, Eq)
 data PlayerId = Red | Blue deriving (Show, Eq, Ord, Enum)
-data Player = Player Circle Velocity2D Gun PlayerId (Maybe JoystickID)
+data Player = Player Circle Velocity2D Gun Health PlayerId (Maybe JoystickID)
               deriving (Show, Eq)
+
+playerMaxHealth :: Health
+playerMaxHealth = 1.0
 
 playerSide :: Size1D
 playerSide = 60
@@ -74,6 +81,7 @@ rightBumberButtonId = 5
 rightTriggerButtonId = 5
 baseColor = PixelRGBA8 0xE6 0xE6 0xE6 255
 loadShadeColor = PixelRGBA8 0x16 0x0f 0x35 120
+healthShadeColor = PixelRGBA8 0x48 0x2D 0x3B 120 -- 0x16 0x0f 0x35 50
 baseImageId = "playerBase"
 
 playerSize :: Size2D
@@ -83,21 +91,23 @@ createPlayer :: Position2D -> Angle2D -> PlayerId -> Maybe JoystickID -> Player
 createPlayer pos direction = Player (Circle pos (playerSide / 2))
                                     (V2 0 0)
                                     (Gun (Aim2D 0 0 direction) 0 Idle)
+                                    playerMaxHealth
 
 staticPlayerImage :: (ImageId, VectorImage)
 staticPlayerImage = (baseImageId, toSolidCircleImage baseColor playerRadius)
 
 drawPlayer :: Player -> [(Rectangle Float, Either VectorImage ImageId)]
-drawPlayer (Player shape _ gun playerId _) =
+drawPlayer (Player shape _ gun health playerId _) =
     let Circle _ radius = shape
         Gun (Aim2D _ _ direction) reloadTime _ = gun
-        center          = Rasterific.V2 radius radius
+        center          = R.V2 radius radius
         textureArea     = toTextureArea shape
         diameter        = toDiameter radius
+        healthRadians   = (1 - health) * (2 * pi)
         aimShape =
                 withClipping
                         ( stroke (playerSide / 3) JoinRound (CapRound, CapRound)
-                        $ line center (Rasterific.V2 playerSide radius)
+                        $ line center (R.V2 playerSide radius)
                         )
                     $ toDrawing radius
         shadowLength = reloadTimeToAimShadowLength (radius * 4 / 3) reloadTime
@@ -107,16 +117,47 @@ drawPlayer (Player shape _ gun playerId _) =
               $ VectorImage (V2 diameter diameter) transparent
               $ withTransformation (rotateCenter direction center)
               $ do
+                    withTexture (uniformTexture healthShadeColor) $ withClipping
+                        (fill $ polygon $ scaleAndOffset radius $ squareSector
+                            healthRadians
+                        )
+                        (toDrawing radius)
                     withTexture (uniformTexture $ aimColor playerId) aimShape
                     withTexture (uniformTexture loadShadeColor) $ withClipping
                         (fill $ rectangle
-                            (Rasterific.V2 (radius * 2 / 3) (radius * 2 / 3))
+                            (R.V2 (radius * 2 / 3) (radius * 2 / 3))
                             shadowLength
                             (playerSide / 3)
                         )
                         aimShape
           )
         ]
+
+scaleAndOffset :: Size1D -> [R.V2 Float] -> [R.V2 Float]
+scaleAndOffset value = map $ fmap (+ value) . (^* value)
+
+squareSector :: Angle2D -> [R.V2 Float]
+squareSector a
+    | a <= 0
+    = []
+    | a > 0 && a <= (pi / 4)
+    = R.V2 1 (-tan a) : squareSector0
+    | a > (pi / 4) && a <= (pi * 3 / 4)
+    = R.V2 (tan $ pi / 2 - a) (-1) : squareSector45
+    | a > (pi * 3 / 4) && a <= (pi * 5 / 4)
+    = R.V2 (-1) (tan a) : squareSector135
+    | a > (pi * 5 / 4) && a <= (pi * 7 / 4)
+    = R.V2 (tan $ a - pi / 2) 1 : squareSector225
+    | a > (pi * 7 / 4) && a < (2 * pi)
+    = R.V2 1 (-tan a) : squareSector315
+    | otherwise
+    = [R.V2 1 1, R.V2 (-1) 1, R.V2 (-1) (-1), R.V2 1 (-1)]
+  where
+    squareSector0   = [R.V2 1 0, R.V2 0 0]
+    squareSector45  = R.V2 1 (-1) : squareSector0
+    squareSector135 = R.V2 (-1) (-1) : squareSector45
+    squareSector225 = R.V2 (-1) 1 : squareSector135
+    squareSector315 = R.V2 1 1 : squareSector225
 
 reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
 reloadTimeToAimShadowLength maxShadowWidth reloadTime =
@@ -142,7 +183,7 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
 updatePlayer events dt obstacles player =
     let
-        Player shape velocity gun playerId maybeJoystickId = player
+        Player shape velocity gun health playerId maybeJoystickId = player
         Gun aim reloadTime state = gun
         axisEvents               = case maybeJoystickId of
             Just joystickId ->
@@ -159,6 +200,7 @@ updatePlayer events dt obstacles player =
         Player newCircle
                newVelocity
                (Gun newAim newReloadTime state)
+               health
                playerId
                (updateJoystick events =<< maybeJoystickId)
 
@@ -194,15 +236,15 @@ updateVelocity (V2 x y) (axisId, axisPos) =
             1 -> createVelocity x newV
             _ -> V2 x y
 
-triggerShot :: [Event] -> Player -> (Player, Maybe Shot)
-triggerShot events player =
+triggerShot :: [Event] -> ShotId -> Player -> (Player, Maybe Shot)
+triggerShot events shotId player =
     let
-        Player (Circle position _) _ gun _ maybeJoystickId = player
+        Player (Circle position _) _ gun _ _ maybeJoystickId = player
         Gun aim reloadTime state = gun
         Aim2D _ _ direction = aim
         newState = getGunState state maybeJoystickId events
         (newReloadTime, maybeShot) = if reloadTime == 0 && newState == Firing
-            then (minShotInterval, Just $ createShot position direction)
+            then (minShotInterval, Just $ createShot position direction shotId)
             else (reloadTime, Nothing)
     in
         (setGun (Gun aim newReloadTime newState) player, maybeShot)
@@ -230,18 +272,24 @@ eventToGunState playerJoystickId (Event _ (JoyButtonEvent buttonEventData)) =
 eventToGunState _ _ = Nothing
 
 setGun :: Gun -> Player -> Player
-setGun gun (Player shape velocity _ playerId joystickId) =
-    Player shape velocity gun playerId joystickId
+setGun gun (Player shape velocity _ health playerId joystickId) =
+    Player shape velocity gun health playerId joystickId
 
 playerToCircle :: Player -> Circle
-playerToCircle (Player shape _ _ _ _) = shape
+playerToCircle (Player shape _ _ _ _ _) = shape
 
 getPlayerId :: Player -> PlayerId
-getPlayerId (Player _ _ _ playerId _) = playerId
+getPlayerId (Player _ _ _ _ playerId _) = playerId
 
 hasJoystick :: Player -> Bool
-hasJoystick (Player _ _ _ _ maybeJoystickId) = isJust maybeJoystickId
+hasJoystick (Player _ _ _ _ _ maybeJoystickId) = isJust maybeJoystickId
 
 setJoystickId :: JoystickID -> Player -> Player
-setJoystickId joystickId (Player shape velocity gun playerId _) =
-    Player shape velocity gun playerId $ Just joystickId
+setJoystickId joystickId (Player shape velocity gun health playerId _) =
+    Player shape velocity gun health playerId $ Just joystickId
+
+inflictDamage :: Health -> Player -> Player
+inflictDamage damage (Player shape velocity gun health playerId joystickId) =
+    Player shape velocity gun newHealth playerId joystickId
+  where
+    newHealth = if damage >= health then playerMaxHealth else health - damage

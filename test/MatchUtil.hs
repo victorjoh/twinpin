@@ -4,22 +4,23 @@ import           Player
 import           Match
 import           Shot
 
-getFirstPlayerWithBarrel :: Match -> PlayerWithBarrel
-getFirstPlayerWithBarrel (Match (Movables _ players) _) = head players
+getFirstIntersectedPlayer :: Match -> IntersectedPlayer
+getFirstIntersectedPlayer (Match (Movables _ _ players) _) = head players
 
 getPlayers :: Match -> [Player]
-getPlayers (Match (Movables _ playersWithBarrels) _) =
-    map toPlayer playersWithBarrels
+getPlayers (Match (Movables _ _ intersectedPlayers) _) =
+    map toPlayer intersectedPlayers
 
-toPlayer :: PlayerWithBarrel -> Player
-toPlayer (PlayerWithBarrel player _) = player
+toPlayer :: IntersectedPlayer -> Player
+toPlayer (IntersectedPlayer _ player) = player
 
 getFirstPlayer :: Match -> Player
-getFirstPlayer match = toPlayer $ getFirstPlayerWithBarrel match
+getFirstPlayer match = toPlayer $ getFirstIntersectedPlayer match
 
-getFirstBarrel :: Match -> [Shot]
-getFirstBarrel match =
-    let PlayerWithBarrel _ barrel = getFirstPlayerWithBarrel match in barrel
+getFirstIntersecting :: Match -> [ShotId]
+getFirstIntersecting match =
+    let IntersectedPlayer intersecting _ = getFirstIntersectedPlayer match
+    in  intersecting
 
 getShots :: Match -> [Shot]
-getShots (Match (Movables shots _) _) = shots
+getShots (Match (Movables _ shots _) _) = shots

@@ -90,3 +90,6 @@ tests:
     - sdl2
     - HUnit-approx
     - JuicyPixels
+    - Rasterific
+    - HUnit
+    - call-stack

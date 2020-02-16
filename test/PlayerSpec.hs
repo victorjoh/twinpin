@@ -1,3 +1,4 @@
+{-# LANGUAGE ImplicitParams #-}
 module PlayerSpec where
 
 import           Test.Hspec
@@ -10,6 +11,46 @@ import           SDL
 import           SDL.Input.Joystick             ( JoyButtonState(..) )
 import           Data.Maybe
 import           Data.List                      ( replicate )
+import qualified Graphics.Rasterific           as R
+                                                ( V2(..) )
+import           Test.HUnit.Base                ( Assertion )
+import           Control.Monad                  ( when )
+import           Test.HUnit.Lang                ( HUnitFailure(..)
+                                                , FailureReason(..)
+                                                )
+import           Control.Exception              ( throwIO )
+import           Data.CallStack
+
+location :: HasCallStack => Maybe SrcLoc
+location = case reverse callStack of
+    (_, loc) : _ -> Just loc
+    []           -> Nothing
+
+shouldApproxBe
+    :: ( HasCallStack
+       , Ord a
+       , Num (f a)
+       , Show (f a)
+       , Foldable f
+       , Functor f
+       , Eq (f a)
+       , Show a
+       , ?epsilon::a
+       )
+    => [f a]
+    -> [f a]
+    -> Assertion
+shouldApproxBe expected actual
+    | length expected /= length actual
+    = expected `shouldBe` actual
+    | otherwise
+    = when (any (or . fmap (> ?epsilon) . abs) $ zipWith (-) actual expected)
+        $ throwIO
+              (HUnitFailure location $ ExpectedButGot
+                  (Just $ "maximum margin of error: " ++ show ?epsilon)
+                  (show expected)
+                  (show actual)
+              )
 
 spec :: Spec
 spec = do
@@ -161,10 +202,10 @@ spec = do
                   player = createPlayer playerPos playerAngle Red (Just 0)
                   (Gun aim _ _)  = getGun player
                   triggerPressed = JoyButtonEventData 0 5 JoyButtonPressed
-              in  triggerShot [toEvent triggerPressed] player
+              in  triggerShot [toEvent triggerPressed] 8 player
                       `shouldBe` ( setGun (Gun aim minShotInterval Firing)
                                           player
-                                 , Just (createShot playerPos playerAngle)
+                                 , Just (createShot playerPos playerAngle 8)
                                  )
         it
                 (  "does not trigger a shot if some other button is pressed"
@@ -173,12 +214,14 @@ spec = do
             $ let unusedPressed = JoyButtonEventData 0 0 JoyButtonPressed
                   maybeShot     = snd $ triggerShot
                       (toEvents [unusedPressed])
+                      8
                       (createPlayer (V2 40 50) 30 Red (Just 0))
               in  maybeShot `shouldSatisfy` isNothing
         it "ignores events from different gamepads"
             $ let joystickId = 1
                   maybeShot  = snd $ triggerShot
                       [createTriggerEvent 0 JoyButtonPressed]
+                      8
                       (createPlayer (V2 40 50) 30 Red (Just joystickId))
               in  maybeShot `shouldSatisfy` isNothing
         it "does not trigger a shot if the player is reloading"
@@ -187,6 +230,7 @@ spec = do
                       setReloadTime 10 $ createPlayer (V2 0 0) 0 Red (Just 0)
                   maybeShot = snd $ triggerShot
                       [createTriggerEvent 0 JoyButtonPressed]
+                      8
                       player
               in
                   maybeShot `shouldSatisfy` isNothing
@@ -195,39 +239,177 @@ spec = do
                   old     = createPlayer (V2 0 0) 0 Red (Just 0)
                   between = fst $ triggerShot
                       [createTriggerEvent 0 JoyButtonPressed]
+                      8
                       old
-                  maybeShot = snd $ triggerShot [] $ setReloadTime 0 between
+                  maybeShot = snd $ triggerShot [] 8 $ setReloadTime 0 between
               in
                   maybeShot `shouldSatisfy` isJust
         it "stops shooting when the trigger is released"
             $ let
                   old = createPlayer (V2 0 0) 0 Red (Just 0)
                   (between, _) =
-                      triggerShot [createTriggerEvent 0 JoyButtonPressed] old
+                      triggerShot [createTriggerEvent 0 JoyButtonPressed] 8 old
                   reloadedBetween = setReloadTime 0 between
                   triggerReleased = createTriggerEvent 0 JoyButtonReleased
                   maybeShot =
-                      snd $ triggerShot [triggerReleased] reloadedBetween
+                      snd $ triggerShot [triggerReleased] 9 reloadedBetween
               in
                   maybeShot `shouldSatisfy` isNothing
         it "triggers a shot if the right trigger button is pressed"
-            $ let triggerPressed =
+            $ let
+                  triggerPressed =
                       JoyAxisEventData 0 5 (triggerMinFireValue + 1)
-                  player    = createPlayer (V2 0 0) 0 Red (Just 0)
-                  maybeShot = snd $ triggerShot [toEvent triggerPressed] player
-              in  maybeShot `shouldSatisfy` isJust
+                  player = createPlayer (V2 0 0) 0 Red (Just 0)
+                  maybeShot =
+                      snd $ triggerShot [toEvent triggerPressed] 8 player
+              in
+                  maybeShot `shouldSatisfy` isJust
         it
                 (  "does not trigger a shot if the right trigger button is not"
                 ++ " pressed far enough"
                 )
-            $ let triggerPressed =
+            $ let
+                  triggerPressed =
                       JoyAxisEventData 0 5 (triggerMinFireValue - 1)
-                  player    = createPlayer (V2 0 0) 0 Red (Just 0)
-                  maybeShot = snd $ triggerShot [toEvent triggerPressed] player
-              in  maybeShot `shouldSatisfy` isNothing
+                  player = createPlayer (V2 0 0) 0 Red (Just 0)
+                  maybeShot =
+                      snd $ triggerShot [toEvent triggerPressed] 8 player
+              in
+                  maybeShot `shouldSatisfy` isNothing
         it "respects the sequential order of the supplied events"
-            $ let old             = createPlayer (V2 0 0) 0 Red (Just 0)
+            $ let
+                  old             = createPlayer (V2 0 0) 0 Red (Just 0)
                   triggerPressed  = createTriggerEvent 0 JoyButtonPressed
                   triggerReleased = createTriggerEvent 0 JoyButtonReleased
-                  new = fst $ triggerShot [triggerPressed, triggerReleased] old
-              in  getGunState new `shouldBe` Idle
+                  new =
+                      fst $ triggerShot [triggerPressed, triggerReleased] 8 old
+              in
+                  getGunState new `shouldBe` Idle
+
+    describe "squareSector" $ do
+        let ?epsilon = 0.00001
+        let tan30    = tan $ pi / 6
+        it "gives no points if angle is 0 deg" $ squareSector 0 `shouldBe` []
+        it "gives no points if angle is less than 0 deg"
+            $          squareSector (-pi / 4)
+            `shouldBe` []
+        it "gives a square sector for 30 deg"
+            $                squareSector (pi / 6)
+            `shouldApproxBe` [R.V2 1 (-tan30), R.V2 1 0, R.V2 0 0]
+        it "gives a square sector for 45 deg"
+            $                squareSector (pi / 4)
+            `shouldApproxBe` [R.V2 1 (-1), R.V2 1 0, R.V2 0 0]
+        it "gives a square sector for 60 deg"
+            $                squareSector (pi / 3)
+            `shouldApproxBe` [R.V2 tan30 (-1), R.V2 1 (-1), R.V2 1 0, R.V2 0 0]
+        it "gives a square sector for 90 deg"
+            $                squareSector (pi / 2)
+            `shouldApproxBe` [R.V2 0 (-1), R.V2 1 (-1), R.V2 1 0, R.V2 0 0]
+        it "gives a square sector for 120 deg"
+            $                squareSector (pi * 2 / 3)
+            `shouldApproxBe` [ R.V2 (-tan30) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 135 deg"
+            $                squareSector (pi * 3 / 4)
+            `shouldApproxBe` [R.V2 (-1) (-1), R.V2 1 (-1), R.V2 1 0, R.V2 0 0]
+        it "gives a square sector for 150 deg"
+            $                squareSector (pi * 5 / 6)
+            `shouldApproxBe` [ R.V2 (-1) (-tan30)
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 180 deg"
+            $                squareSector pi
+            `shouldApproxBe` [ R.V2 (-1) 0
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 210 deg"
+            $                squareSector (pi * 7 / 6)
+            `shouldApproxBe` [ R.V2 (-1) tan30
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 225 deg"
+            $                squareSector (pi * 5 / 4)
+            `shouldApproxBe` [ R.V2 (-1) 1
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 240 deg"
+            $                squareSector (pi * 4 / 3)
+            `shouldApproxBe` [ R.V2 (-tan30) 1
+                             , R.V2 (-1) 1
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 270 deg"
+            $                squareSector (pi * 3 / 2)
+            `shouldApproxBe` [ R.V2 0 1
+                             , R.V2 (-1) 1
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 300 deg"
+            $                squareSector (pi * 5 / 3)
+            `shouldApproxBe` [ R.V2 tan30 1
+                             , R.V2 (-1) 1
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 315 deg"
+            $                squareSector (pi * 7 / 4)
+            `shouldApproxBe` [ R.V2 1 1
+                             , R.V2 (-1) 1
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square sector for 330 deg"
+            $                squareSector (pi * 11 / 6)
+            `shouldApproxBe` [ R.V2 1 tan30
+                             , R.V2 1 1
+                             , R.V2 (-1) 1
+                             , R.V2 (-1) (-1)
+                             , R.V2 1 (-1)
+                             , R.V2 1 0
+                             , R.V2 0 0
+                             ]
+        it "gives a square for 360 deg"
+            $          squareSector (2 * pi)
+            `shouldBe` [R.V2 1 1, R.V2 (-1) 1, R.V2 (-1) (-1), R.V2 1 (-1)]
+        it "gives a square for angles above 360 deg"
+            $          squareSector (pi * 9 / 4)
+            `shouldBe` [R.V2 1 1, R.V2 (-1) 1, R.V2 (-1) (-1), R.V2 1 (-1)]
+
+    describe "scaleAndOffset"
+        $ it "scales and offsets the points with a value"
+        $ scaleAndOffset 2 [R.V2 1 (-1), R.V2 (-1) (-1), R.V2 (-1) 1, R.V2 1 1]
+        `shouldBe` [R.V2 4 0, R.V2 0 0, R.V2 0 4, R.V2 4 4]
+
+    describe "inflictDamage" $ do
+        it "reduces the health of the player"
+            $ let old = createPlayer (V2 0 0) 0 Red Nothing
+              in  getHealth (inflictDamage 0.15 old) `shouldBe` 0.85
+        it "resets the players health to max if health is reduced below zero"
+            $ let old = setHealth 0.05 $ createPlayer (V2 0 0) 0 Red Nothing
+              in  getHealth (inflictDamage 0.15 old) `shouldBe` playerMaxHealth
+

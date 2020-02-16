@@ -21,7 +21,7 @@ import           Test.HUnit.Approx
 spec :: Spec
 spec = do
     let emptyMatch =
-            Match (Movables [] []) (Obstacles (createBounds 1920 1080) [])
+            Match (Movables 0 [] []) (Obstacles (createBounds 1920 1080) [])
 
     describe "createGame"
         $          it "creates a game in a running state"
@@ -83,14 +83,12 @@ spec = do
               in  updateGame [closedEvent] 1 (assignJoysticks [0] createGame)
                       `shouldSatisfy` isFinished
         it "updates the match with how much time has passed since last update"
-            $ let
-                  shot = createShot (V2 100 300) 0
+            $ let shot = createShot (V2 100 300) 0 0
                   shotToMatch s = Match
-                      (Movables [s] [])
+                      (Movables 1 [s] [])
                       (Obstacles (createBounds 1920 1080) [])
                   game = Game 100 $ Running $ shotToMatch shot
-              in
-                  updateGame [] 150 game
+              in  updateGame [] 150 game
                       `shouldBe` Game
                                      150
                                      (Running $ shotToMatch $ updateShot 50 shot
@@ -147,8 +145,8 @@ spec = do
                       `shouldBe` Game 1 (Paused emptyMatch Quit [stickDown])
         it "does not update the match while the game is paused"
             $ let
-                  shot  = createShot (V2 100 300) 0
-                  match = Match (Movables [shot] [])
+                  shot  = createShot (V2 100 300) 0 0
+                  match = Match (Movables 1 [shot] [])
                                 (Obstacles (createBounds 1920 1080) [])
                   game = Game 0 $ Paused match Resume []
               in
@@ -161,8 +159,9 @@ spec = do
                 )
             $ let
                   player = createPlayer (V2 100 300) 0 Red (Just 0)
-                  match  = Match (Movables [] [PlayerWithBarrel player []])
-                                 (Obstacles (createBounds 1920 1080) [])
+                  match  = Match
+                      (Movables 0 [] [IntersectedPlayer [] player])
+                      (Obstacles (createBounds 1920 1080) [])
                   game              = Game 0 $ Paused match Resume []
                   moveRight         = createMoveRightEvent 0 50 200
                   pausedGame        = updateGame [moveRight] 999 game
@@ -181,7 +180,7 @@ spec = do
             $ let
                   player = createPlayer (V2 100 300) 0 Red (Just 0)
                   shotsToMatch shots = Match
-                      (Movables shots [PlayerWithBarrel player []])
+                      (Movables 0 shots [IntersectedPlayer [] player])
                       (Obstacles (createBounds 1920 1080) [])
                   match             = shotsToMatch []
                   game              = Game 0 $ Paused match Resume []
@@ -193,15 +192,16 @@ spec = do
                       updateGame [] 1200 switchedToRunning
               in
                   getShots runningMatch
-                      `shouldBe` [updateShot 200 $ createShot (V2 100 300) 0]
+                      `shouldBe` [updateShot 200 $ createShot (V2 100 300) 0 0]
         it
                 (  "only keeps track of the latest change for a button while "
                 ++ "the game is paused"
                 )
             $ let
                   player = createPlayer (V2 100 300) 0 Red (Just 0)
-                  match  = Match (Movables [] [PlayerWithBarrel player []])
-                                 (Obstacles (createBounds 1920 1080) [])
+                  match  = Match
+                      (Movables 0 [] [IntersectedPlayer [] player])
+                      (Obstacles (createBounds 1920 1080) [])
                   game              = Game 0 $ Paused match Resume []
                   triggerPressed    = createTriggerEvent 0 JoyButtonPressed
                   firstPressed      = updateGame [triggerPressed] 500 game
@@ -230,9 +230,9 @@ spec = do
                                      )
 
     describe "assignJoysticks" $ do
-        let player = PlayerWithBarrel (createPlayer (V2 0 0) 0 Red Nothing) []
+        let player = IntersectedPlayer [] (createPlayer (V2 0 0) 0 Red Nothing)
             match =
-                Match (Movables [] [player]) (Obstacles (createBounds 0 0) [])
+                Match (Movables 0 [] [player]) (Obstacles (createBounds 0 0) [])
         it "assigns joysticks to the match when running"
             $ let game                      = Game 0 $ Running match
                   Game _ (Running newMatch) = assignJoysticks [1] game

@@ -57,7 +57,7 @@ The entry point is found in [Main]. [Main] contains all the IO, in fact all side
 effects of twinpin are limited to [Main] only. [Main] communicates with [Game],
 which is responsible for updating the game state given some user input. Below is
 the complete module dependency graph. Edges implied by transitivity are not
-shown, the image would be too cluttered otherwise.
+shown, the image would be too cluttered if they were.
 
 ![twinpin module dependencies](doc/module-dependencies.svg)
 
@@ -71,7 +71,7 @@ Below [Game] in the graph are:
 * [Circle], which contains most of the physics. It updates a circle's position
   given a velocity.
 * [Visual], which contains convenience functions for moving from memory
-  representations to drawable images
+  representations to drawable images.
 * [Space], which contains the basic data types and geometric functions.
 
 ### How to generate graph

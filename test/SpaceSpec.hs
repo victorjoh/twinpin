@@ -169,8 +169,8 @@ spec = do
             $          offsetDistanceToOrigin2D (-2) (-1, 0, 5)
             `shouldBe` (-1, 0, 3)
         it
-                ("when moving towards the origin with an offset bigger than the"
-                ++ "distance the line will cross the origin"
+                ("when moving towards the origin with an offset bigger than "
+                ++ "the distance the line will cross the origin"
                 )
             $          offsetDistanceToOrigin2D (-7) (-1, 0, 5)
             `shouldBe` (-1, 0, 0)

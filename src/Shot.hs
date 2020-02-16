@@ -1,6 +1,9 @@
 module Shot
     ( Shot(..)
     , ShotState(..)
+    , ShotId
+    , Health
+    , shotDamage
     , staticShotImages
     , shotSpeed
     , shotRadius
@@ -10,6 +13,7 @@ module Shot
     , isShotWithinBounds
     , shotToCircle
     , setShotHit
+    , getShotId
     )
 where
 
@@ -19,8 +23,13 @@ import           Visual
 import           SDL
 import           Codec.Picture.Types
 
-data Shot = Shot Circle Velocity2D ShotState deriving (Show, Eq)
+type ShotId = Int
+data Shot = Shot Circle Velocity2D ShotState ShotId deriving (Show, Eq)
 data ShotState = HasHitPlayer | HasNotHitPlayer deriving (Show, Eq)
+
+type Health = Float
+shotDamage :: Health
+shotDamage = 0.15
 
 shotSpeed :: Speed
 shotSpeed = 1.26
@@ -31,7 +40,7 @@ shotRadius = 10
 hasNotHitPlayerImageId = "hasNotHitPlayerShot"
 hasHitPlayerImageId = "hasHitPlayerShot"
 
-createShot :: Position2D -> Angle2D -> Shot
+createShot :: Position2D -> Angle2D -> ShotId -> Shot
 createShot position direction = Shot (Circle position shotRadius)
                                      (toVelocity direction shotSpeed)
                                      HasNotHitPlayer
@@ -46,7 +55,7 @@ staticShotImages =
     ]
 
 drawShot :: Shot -> (Rectangle Float, Either VectorImage ImageId)
-drawShot (Shot circle _ state) =
+drawShot (Shot circle _ state _) =
     ( toTextureArea circle
     , case state of
         HasNotHitPlayer -> Right hasNotHitPlayerImageId
@@ -54,15 +63,19 @@ drawShot (Shot circle _ state) =
     )
 
 updateShot :: DeltaTime -> Shot -> Shot
-updateShot dt (Shot circle velocity state) =
-    Shot (updateCirclePosition velocity dt circle) velocity state
+updateShot dt (Shot circle velocity state shotId) =
+    Shot (updateCirclePosition velocity dt circle) velocity state shotId
 
 isShotWithinBounds :: Bounds2D -> Shot -> Bool
-isShotWithinBounds bounds (Shot circle _ _) =
+isShotWithinBounds bounds (Shot circle _ _ _) =
     isCircleWithinBounds bounds circle
 
 shotToCircle :: Shot -> Circle
-shotToCircle (Shot circle _ _) = circle
+shotToCircle (Shot circle _ _ _) = circle
 
 setShotHit :: Shot -> Shot
-setShotHit (Shot circle velocity _) = Shot circle velocity HasHitPlayer
+setShotHit (Shot circle velocity _ shotId) =
+    Shot circle velocity HasHitPlayer shotId
+
+getShotId :: Shot -> ShotId
+getShotId (Shot _ _ _ shotId) = shotId
