@@ -128,7 +128,6 @@ updatePlayers events dt obstacles = mapIntersectedPlayers $ godFoldr
     . addToObstacles obstacles
     )
 
-
 -- Fold a list from the right with a function that depends on all folded values
 -- and all non-folded values when folding a single value.
 godFoldr :: ([a] -> a -> [b] -> b) -> [a] -> [b]

@@ -52,7 +52,7 @@ cabal update
 as written in [this github issue for Haskell IDE
 Engine](https://github.com/haskell/haskell-ide-engine/issues/658).
 
-## twinpin code architecture
+## Twinpin code architecture
 The entry point is found in [Main]. [Main] contains all the IO, in fact all side
 effects of twinpin are limited to [Main] only. [Main] communicates with [Game],
 which is responsible for updating the game state given some user input. Below is
