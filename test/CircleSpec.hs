@@ -23,29 +23,27 @@ spec = do
             $ not
             $ areIntersecting (Circle (V2 10 20) 3) (Circle (V2 12 23.5) 1)
 
-    describe "updateCollidingCirclePosition" $ do
+    describe "moveCollidingCircle" $ do
         it "restricts position of the circle when colliding with bounds"
-            $          updateCollidingCirclePosition
-                           (V2 10 10)
-                           1
-                           (Obstacles (Bounds2D (0, 10) (0, 20)) [])
-                           (Circle (V2 5 7) 1)
+            $ moveCollidingCircle (V2 10 10)
+                                  1
+                                  (Obstacles (Bounds2D (0, 10) (0, 20)) [])
+                                  (Circle (V2 5 7) 1)
             `shouldBe` Circle (V2 9 17) 1
         it
                 ("does not keep the circle at the bounds when moving away from"
                 ++ " the bounds"
                 )
-            $          updateCollidingCirclePosition
-                           (V2 5 5)
-                           1
-                           (Obstacles (Bounds2D (0, 10) (0, 10)) [])
-                           (Circle (V2 1 1) 1)
+            $ moveCollidingCircle (V2 5 5)
+                                  1
+                                  (Obstacles (Bounds2D (0, 10) (0, 10)) [])
+                                  (Circle (V2 1 1) 1)
             `shouldBe` Circle (V2 6 6) 1
         it
                 ("restricts position of the circle when colliding with another"
                 ++ " circle from the top left"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 10 10)
                            1
                            (Obstacles (Bounds2D (0, 1000) (0, 1000))
@@ -57,7 +55,7 @@ spec = do
                 (  "restricts position of the circle when colliding vertically"
                 ++ " with another circle"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 0 10)
                            1
                            (Obstacles (Bounds2D (0, 1000) (0, 1000))
@@ -69,7 +67,7 @@ spec = do
                 (  "restricts position of the circle when colliding ALMOST"
                 ++ " vertically with another circle"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 0.0001 10)
                            1
                            (Obstacles (Bounds2D (0, 1000) (0, 1000))
@@ -81,7 +79,7 @@ spec = do
                 (  "restricts position of the circle when colliding"
                 ++ " horizontally with another circle"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 10 0)
                            1
                            (Obstacles (Bounds2D (0, 1000) (0, 1000))
@@ -93,7 +91,7 @@ spec = do
                 (  "moves the player along the circle obstacle when colliding"
                 ++ " with it at an angle"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 10 1)
                            1
                            (Obstacles (Bounds2D (0, 1000) (0, 1000))
@@ -105,7 +103,7 @@ spec = do
                 (  "does not keep the circle at an obstacle when moving away"
                 ++ " from it"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 (-10) 0)
                            1
                            (Obstacles (Bounds2D (0, 1000) (0, 1000))
@@ -117,7 +115,7 @@ spec = do
                 (  "restricts position of the circle when colliding with the"
                 ++ " bounds and then a circle"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 10 10)
                            1
                            (Obstacles (Bounds2D (0, 200) (0, 200))
@@ -126,7 +124,7 @@ spec = do
                            (Circle (V2 198 95) 2)
             `shouldBe` Circle (V2 198 98.34169) 2
         it "can handle no velocity"
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 0 0)
                            1
                            (Obstacles (Bounds2D (0, 200) (0, 200))
@@ -138,7 +136,7 @@ spec = do
                 (  "restricts position of the circle when colliding with a"
                 ++ " circle and then the bounds"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 0 100)
                            1
                            (Obstacles (Bounds2D (0, 200) (0, 200))
@@ -150,7 +148,7 @@ spec = do
                 (  "restricts position of the circle when colliding with a"
                 ++ " circle and then another circle"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 0 (-4))
                            100
                            (Obstacles (Bounds2D (0, 800) (0, 600))
@@ -163,7 +161,7 @@ spec = do
                 ++ " circle and then after leaving the circle before colliding"
                 ++ " with the bounds"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 100 0)
                            1
                            (Obstacles (Bounds2D (0, 120) (0, 120))
@@ -175,7 +173,7 @@ spec = do
                 (  "keeps the circle in position if it is pushing against"
                 ++ " another circle and the bounds"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 (-0.2403) (-0.26086))
                            22
                            (Obstacles (Bounds2D (0, 800) (0, 600))
@@ -188,7 +186,7 @@ spec = do
                 ++ " between that other circle and the bounds given that"
                 ++ " the movement direction is right"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 (-4) 0)
                            100
                            (Obstacles (Bounds2D (-10.0, 8.0) (-100, 100))
@@ -200,7 +198,7 @@ spec = do
                 (  "keeps the circle in position if it is pushing against"
                 ++ " two other circles"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 0 (-4))
                            100
                            (Obstacles (Bounds2D (0, 800) (0, 600))
@@ -213,7 +211,7 @@ spec = do
                 ++ " wedged between two other circles given that the"
                 ++ " movement direction is right"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 (-4) 0)
                            1000
                            (Obstacles (Bounds2D (0, 800) (0, 600))
@@ -226,7 +224,7 @@ spec = do
                 ++ " bounds, it does not matter that there is a circle along"
                 ++ " the bounds further away"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 1 (-10))
                            1
                            (Obstacles (Bounds2D (0, 800) (0, 600))
@@ -238,7 +236,7 @@ spec = do
                 (  "reduces the distance traveled for the moving circle when"
                 ++ "hitting another circle at an angle"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 0 10)
                            1
                            (Obstacles (Bounds2D (0, 800) (0, 600))
@@ -250,7 +248,7 @@ spec = do
                 (  "keeps the circle in position if it is pushing against"
                 ++ " two other circles (of different sizes)"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 0.0 (-100))
                            21
                            (Obstacles
@@ -266,7 +264,7 @@ spec = do
                 ++ " sizes) when it is wedged between them given that the"
                 ++ " movement direction is right (1)"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 (-0.32768) 0)
                            21
                            (Obstacles
@@ -282,7 +280,7 @@ spec = do
                 ++ " sizes) when it is wedged between them given that the"
                 ++ " movement direction is right (2)"
                 )
-            $          updateCollidingCirclePosition
+            $          moveCollidingCircle
                            (V2 (-0.51724803) 0.46882802)
                            15
                            (Obstacles

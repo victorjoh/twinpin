@@ -7,8 +7,8 @@ module Circle
     , toSolidCircleImage
     , areIntersecting
     , isCircleWithinBounds
-    , updateCirclePosition
-    , updateCollidingCirclePosition
+    , moveCircle
+    , moveCollidingCircle
     , Obstacles(..)
     )
 where
@@ -75,13 +75,12 @@ isCircleWithinBounds :: Bounds2D -> Circle -> Bool
 isCircleWithinBounds bounds (Circle position radius) =
     isWithinBounds2D position $ increaseBounds2D bounds $ boundingBoxSize radius
 
-updateCirclePosition :: Velocity2D -> DeltaTime -> Circle -> Circle
-updateCirclePosition velocity dt (Circle oldPosition radius) =
+moveCircle :: Velocity2D -> DeltaTime -> Circle -> Circle
+moveCircle velocity dt (Circle oldPosition radius) =
     Circle (updatePosition2D oldPosition velocity dt) radius
 
-updateCollidingCirclePosition
-    :: Velocity2D -> DeltaTime -> Obstacles -> Circle -> Circle
-updateCollidingCirclePosition velocity dt obstacles (Circle start radius) =
+moveCollidingCircle :: Velocity2D -> DeltaTime -> Obstacles -> Circle -> Circle
+moveCollidingCircle velocity dt obstacles (Circle start radius) =
     let end = updatePosition2D start velocity dt
     in  Circle (moveFreely radius (StraightMovement start end) obstacles) radius
 

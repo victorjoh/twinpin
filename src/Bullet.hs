@@ -64,7 +64,7 @@ drawBullet (Bullet circle _ state _) =
 
 updateBullet :: DeltaTime -> Bullet -> Bullet
 updateBullet dt (Bullet circle velocity state bulletId) =
-    Bullet (updateCirclePosition velocity dt circle) velocity state bulletId
+    Bullet (moveCircle velocity dt circle) velocity state bulletId
 
 isBulletWithinBounds :: Bounds2D -> Bullet -> Bool
 isBulletWithinBounds bounds (Bullet circle _ _ _) =

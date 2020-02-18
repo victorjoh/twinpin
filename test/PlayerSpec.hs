@@ -255,7 +255,7 @@ spec = do
                       snd $ fireBullet [triggerReleased] 9 reloadedBetween
               in
                   maybeBullet `shouldSatisfy` isNothing
-        it "triggers a bullet if the right trigger button is pressed"
+        it "fires a bullet if the right trigger button is pressed"
             $ let
                   triggerPressed =
                       JoyAxisEventData 0 5 (triggerMinFireValue + 1)
@@ -265,7 +265,7 @@ spec = do
               in
                   maybeBullet `shouldSatisfy` isJust
         it
-                ("does not trigger a bullet if the right trigger button is not"
+                ("does not fire a bullet if the right trigger button is not"
                 ++ " pressed far enough"
                 )
             $ let

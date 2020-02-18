@@ -182,8 +182,7 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
 
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
 updatePlayer events dt obstacles player =
-    let
-        Player shape velocity gun health playerId maybeJoystickId = player
+    let Player shape velocity gun health playerId maybeJoystickId = player
         Gun aim reloadTime state = gun
         axisEvents               = case maybeJoystickId of
             Just joystickId ->
@@ -191,13 +190,11 @@ updatePlayer events dt obstacles player =
                     $ filter ((joystickId ==) . joyAxisEventWhich)
                     $ mapMaybe toJoyAxis events
             Nothing -> []
-        newVelocity = foldl' updateVelocity velocity axisEvents
-        newAim      = foldl' updateAim aim axisEvents
-        newCircle =
-            updateCollidingCirclePosition newVelocity dt obstacles shape
+        newVelocity   = foldl' updateVelocity velocity axisEvents
+        newAim        = foldl' updateAim aim axisEvents
+        newCircle     = moveCollidingCircle newVelocity dt obstacles shape
         newReloadTime = max 0 $ reloadTime - dt
-    in
-        Player newCircle
+    in  Player newCircle
                newVelocity
                (Gun newAim newReloadTime state)
                health
@@ -238,8 +235,7 @@ updateVelocity (V2 x y) (axisId, axisPos) =
 
 fireBullet :: [Event] -> BulletId -> Player -> (Player, Maybe Bullet)
 fireBullet events bulletId player =
-    let
-        Player (Circle position _) _ gun _ _ maybeJoystickId = player
+    let Player (Circle position _) _ gun _ _ maybeJoystickId = player
         Gun aim reloadTime state = gun
         Aim2D _ _ direction = aim
         newState = getGunState state maybeJoystickId events
@@ -249,8 +245,7 @@ fireBullet events bulletId player =
                 , Just $ createBullet position direction bulletId
                 )
             else (reloadTime, Nothing)
-    in
-        (setGun (Gun aim newReloadTime newState) player, maybeBullet)
+    in  (setGun (Gun aim newReloadTime newState) player, maybeBullet)
 
 getGunState :: GunState -> Maybe JoystickID -> [Event] -> GunState
 getGunState gunState (Just joystickId) events =
