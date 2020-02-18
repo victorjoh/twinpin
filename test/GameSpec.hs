@@ -6,7 +6,7 @@ import           Game
 import           Match
 import           Circle
 import           Space
-import           Shot
+import           Bullet
 import           Player
 import           Menu
 import           PlayerUtil
@@ -83,15 +83,17 @@ spec = do
               in  updateGame [closedEvent] 1 (assignJoysticks [0] createGame)
                       `shouldSatisfy` isFinished
         it "updates the match with how much time has passed since last update"
-            $ let shot = createShot (V2 100 300) 0 0
-                  shotToMatch s = Match
+            $ let bullet = createBullet (V2 100 300) 0 0
+                  bulletToMatch s = Match
                       (Movables 1 [s] [])
                       (Obstacles (createBounds 1920 1080) [])
-                  game = Game 100 $ Running $ shotToMatch shot
+                  game = Game 100 $ Running $ bulletToMatch bullet
               in  updateGame [] 150 game
                       `shouldBe` Game
                                      150
-                                     (Running $ shotToMatch $ updateShot 50 shot
+                                     (Running $ bulletToMatch $ updateBullet
+                                         50
+                                         bullet
                                      )
         it "opens the pause menu when the options button is pressed"
             $ let optionsPressed = createButtonPressedEvent 0 9
@@ -145,9 +147,9 @@ spec = do
                       `shouldBe` Game 1 (Paused emptyMatch Quit [stickDown])
         it "does not update the match while the game is paused"
             $ let
-                  shot  = createShot (V2 100 300) 0 0
-                  match = Match (Movables 1 [shot] [])
-                                (Obstacles (createBounds 1920 1080) [])
+                  bullet = createBullet (V2 100 300) 0 0
+                  match  = Match (Movables 1 [bullet] [])
+                                 (Obstacles (createBounds 1920 1080) [])
                   game = Game 0 $ Paused match Resume []
               in
                   updateGame [] 50 game
@@ -179,10 +181,10 @@ spec = do
                 )
             $ let
                   player = createPlayer (V2 100 300) 0 Red (Just 0)
-                  shotsToMatch shots = Match
-                      (Movables 0 shots [IntersectedPlayer [] player])
+                  bulletsToMatch bullets = Match
+                      (Movables 0 bullets [IntersectedPlayer [] player])
                       (Obstacles (createBounds 1920 1080) [])
-                  match             = shotsToMatch []
+                  match             = bulletsToMatch []
                   game              = Game 0 $ Paused match Resume []
                   triggerPressed    = createTriggerEvent 0 JoyButtonPressed
                   pausedGame        = updateGame [triggerPressed] 999 game
@@ -191,8 +193,10 @@ spec = do
                   Game _ (Running runningMatch) =
                       updateGame [] 1200 switchedToRunning
               in
-                  getShots runningMatch
-                      `shouldBe` [updateShot 200 $ createShot (V2 100 300) 0 0]
+                  getBullets runningMatch
+                      `shouldBe` [ updateBullet 200
+                                       $ createBullet (V2 100 300) 0 0
+                                 ]
         it
                 (  "only keeps track of the latest change for a button while "
                 ++ "the game is paused"

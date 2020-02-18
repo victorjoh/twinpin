@@ -16,7 +16,7 @@ module Match
 where
 
 import           Player
-import           Shot
+import           Bullet
 import           Space
 import           Circle
 import           Visual
@@ -27,11 +27,12 @@ import           Data.List                      ( delete )
 import           SDL.Raw.Types                  ( JoystickID )
 import           Data.Bifunctor                 ( second )
 
--- We keep track of shots that intersect with a player so that they won't be hit
--- twice by shots from other player, or hit by their own shot immediately after
--- firing.
-data IntersectedPlayer = IntersectedPlayer [ShotId] Player deriving (Show, Eq)
-data Movables = Movables ShotId [Shot] [IntersectedPlayer] deriving (Show, Eq)
+-- We keep track of bullets that intersect with a player so that they won't be
+-- hit twice by a single bullet from other player, or hit by their own bullet
+-- immediately after firing.
+data IntersectedPlayer = IntersectedPlayer [BulletId] Player deriving (Show, Eq)
+data Movables = Movables BulletId [Bullet] [IntersectedPlayer]
+                         deriving (Show, Eq)
 type Pillar = Circle
 
 data Match = Match Movables Obstacles deriving (Show, Eq)
@@ -79,11 +80,11 @@ staticMatchImages :: [(ImageId, VectorImage)]
 staticMatchImages =
     (pillarImageId, toSolidCircleImage pillarColor pillarRadius)
         : staticPlayerImage
-        : staticShotImages
+        : staticBulletImages
 
 drawMatch :: Match -> [(Rectangle Float, Either VectorImage ImageId)]
-drawMatch (Match (Movables _ shots intersectedPlayers) (Obstacles _ pillars)) =
-    map drawShot shots
+drawMatch (Match (Movables _ bullets intersectedPlayers) (Obstacles _ pillars))
+    = map drawBullet bullets
         ++ concatMap (drawPlayer . getPlayer) intersectedPlayers
         ++ map drawPillar pillars
 
@@ -99,30 +100,34 @@ updateMatch events passedTime oldMatch =
         Obstacles bounds      pillars   = obstacles
         newMovables =
                 oldMovables
-                    -- We remove shots that hit pillars where the shot are in
+                    -- We remove bullets that hit pillars when the bullet are in
                     -- their old state. This is because we want to be able to
-                    -- draw the frame where the shot hits the pillar, i.e. the
+                    -- draw the frame where the bullet hits the pillar, i.e. the
                     -- frame produced from 'oldGame'.
                     & removePillarHits pillars
                     & updatePlayers events passedTime obstacles
-                    & moveShots passedTime
-                    & triggerShots events
+                    & moveBullets passedTime
+                    & fireBullets events
                     & updateIntersectingStatus
                     & removeOutOfBounds bounds
     in  Match newMovables obstacles
 
 removePillarHits :: [Pillar] -> Movables -> Movables
-removePillarHits pillars = mapShots $ filter $ \shot ->
-    not $ any (areIntersecting (shotToCircle shot)) pillars
+removePillarHits pillars = mapIntersected $ filter $ \bullet ->
+    not $ any (areIntersecting (bulletToCircle bullet)) pillars
+
+mapIntersectedPlayers
+    :: ([IntersectedPlayer] -> [IntersectedPlayer]) -> Movables -> Movables
+mapIntersectedPlayers f (Movables nextBulletId bullets intersectedPlayers) =
+    Movables nextBulletId bullets (f intersectedPlayers)
 
 updatePlayers :: [Event] -> DeltaTime -> Obstacles -> Movables -> Movables
-updatePlayers events dt obstacles (Movables nextShotId shots intersectedPlayers)
-    = Movables nextShotId shots $ godFoldr
-        ( concatApply
-        $ (mapPlayer . updatePlayer events dt)
-        . addToObstacles obstacles
-        )
-        intersectedPlayers
+updatePlayers events dt obstacles = mapIntersectedPlayers $ godFoldr
+    ( concatApply
+    $ (mapPlayer . updatePlayer events dt)
+    . addToObstacles obstacles
+    )
+
 
 -- Fold a list from the right with a function that depends on all folded values
 -- and all non-folded values when folding a single value.
@@ -143,85 +148,90 @@ addToObstacles (Obstacles bounds pillars) intersectedPlayers =
         $  pillars
         ++ map (playerToCircle . getPlayer) intersectedPlayers
 
-moveShots :: DeltaTime -> Movables -> Movables
-moveShots dt (Movables nextShotId shots intersectedPlayers) =
-    Movables nextShotId (map (updateShot dt) shots) intersectedPlayers
+moveBullets :: DeltaTime -> Movables -> Movables
+moveBullets dt (Movables nextBulletId bullets intersectedPlayers) =
+    Movables nextBulletId (map (updateBullet dt) bullets) intersectedPlayers
 
-triggerShots :: [Event] -> Movables -> Movables
-triggerShots events (Movables nextShotId shots intersectedPlayers) = foldr
-    (triggerShot' events)
-    (Movables nextShotId shots [])
+fireBullets :: [Event] -> Movables -> Movables
+fireBullets events (Movables nextBulletId bullets intersectedPlayers) = foldr
+    (fireBullet' events)
+    (Movables nextBulletId bullets [])
     intersectedPlayers
 
-triggerShot' :: [Event] -> IntersectedPlayer -> Movables -> Movables
-triggerShot' events toBeUpdated updated =
+fireBullet' :: [Event] -> IntersectedPlayer -> Movables -> Movables
+fireBullet' events toBeUpdated updated =
     let
-        Movables nextShotId updatedShots updatedPlayers = updated
+        Movables nextBulletId updatedBullets updatedPlayers = updated
         IntersectedPlayer passingThrough player = toBeUpdated
-        (newPlayer, maybeShot) = triggerShot events nextShotId player
+        (newPlayer, maybeBullet) = fireBullet events nextBulletId player
         ifJust maybeSomething thenDo = maybe id (const thenDo) maybeSomething
-        ifShot            = ifJust maybeShot
-        newPassingThrough = ifShot (nextShotId :) passingThrough
-        newNextShotId     = ifShot (+ 1) nextShotId
+        ifBullet          = ifJust maybeBullet
+        newPassingThrough = ifBullet (nextBulletId :) passingThrough
+        newNextBulletId   = ifBullet (+ 1) nextBulletId
         updatedIntersectedPlayer =
             IntersectedPlayer newPassingThrough newPlayer
     in
-        Movables newNextShotId
-                 (maybe id (:) maybeShot updatedShots)
+        Movables newNextBulletId
+                 (maybe id (:) maybeBullet updatedBullets)
                  (updatedIntersectedPlayer : updatedPlayers)
 
 updateIntersectingStatus :: Movables -> Movables
-updateIntersectingStatus (Movables nextShotId shots players) =
-    foldr updateIntersectingStatus' (Movables nextShotId [] players) shots
+updateIntersectingStatus (Movables nextBulletId bullets players) =
+    foldr updateIntersectingStatus' (Movables nextBulletId [] players) bullets
 
-updateIntersectingStatus' :: Shot -> Movables -> Movables
-updateIntersectingStatus' shot (Movables nextShotId registeredShots players) =
-    let (newShot, registeredPlayers) = foldr registerHit (shot, []) players
-    in  Movables nextShotId (newShot : registeredShots) registeredPlayers
+updateIntersectingStatus' :: Bullet -> Movables -> Movables
+updateIntersectingStatus' bullet updated =
+    let Movables nextBulletId updatedBullets players = updated
+        (newBullet, updatedPlayers) = foldr registerHit (bullet, []) players
+    in  Movables nextBulletId (newBullet : updatedBullets) updatedPlayers
 
 registerHit
     :: IntersectedPlayer
-    -> (Shot, [IntersectedPlayer])
-    -> (Shot, [IntersectedPlayer])
-registerHit piercedPlayer (shot, registered) =
+    -> (Bullet, [IntersectedPlayer])
+    -> (Bullet, [IntersectedPlayer])
+registerHit intersectedPlayer (bullet, registered) =
     let
-        IntersectedPlayer piercingBullets player = piercedPlayer
-        shotId          = getShotId shot
-        alreadyPiercing = elem shotId piercingBullets
+        IntersectedPlayer piercingBullets player = intersectedPlayer
+        bulletId               = getBulletId bullet
+        previouslyIntersecting = elem bulletId piercingBullets
         intersecting =
-            areIntersecting (shotToCircle shot) (playerToCircle player)
+            areIntersecting (bulletToCircle bullet) (playerToCircle player)
     in
-        second (: registered) $ if not alreadyPiercing && intersecting
+        second (: registered) $ if not previouslyIntersecting && intersecting
             then
-                ( setShotHit shot
-                , IntersectedPlayer (shotId : piercingBullets)
-                                    (inflictDamage shotDamage player)
+                ( setBulletHit bullet
+                , IntersectedPlayer (bulletId : piercingBullets)
+                                    (inflictDamage bulletDamage player)
                 )
-            else if alreadyPiercing && not intersecting
-                then (shot, mapIntersecting (delete shotId) piercedPlayer)
-                else (shot, piercedPlayer)
+            else if previouslyIntersecting && not intersecting
+                then
+                    ( bullet
+                    , mapIntersecting (delete bulletId) intersectedPlayer
+                    )
+                else (bullet, intersectedPlayer)
 
 removeOutOfBounds :: Bounds2D -> Movables -> Movables
-removeOutOfBounds bounds = mapShots (filter (isShotWithinBounds bounds))
+removeOutOfBounds bounds =
+    mapIntersected (filter (isBulletWithinBounds bounds))
 
-mapShots :: ([Shot] -> [Shot]) -> Movables -> Movables
-mapShots f (Movables nextShotId shots intersectedPlayers) =
-    Movables nextShotId (f shots) intersectedPlayers
+mapIntersected :: ([Bullet] -> [Bullet]) -> Movables -> Movables
+mapIntersected f (Movables nextBulletId bullets intersectedPlayers) =
+    Movables nextBulletId (f bullets) intersectedPlayers
 
 mapPlayer :: (Player -> Player) -> IntersectedPlayer -> IntersectedPlayer
 mapPlayer f (IntersectedPlayer intersecting player) =
     IntersectedPlayer intersecting (f player)
 
 mapIntersecting
-    :: ([ShotId] -> [ShotId]) -> IntersectedPlayer -> IntersectedPlayer
+    :: ([BulletId] -> [BulletId]) -> IntersectedPlayer -> IntersectedPlayer
 mapIntersecting f (IntersectedPlayer intersecting player) =
     IntersectedPlayer (f intersecting) player
 
 assignJoysticksToMatch :: [JoystickID] -> Match -> Match
 assignJoysticksToMatch newJoysticks (Match movables obstacles) =
-    let Movables nextShotId shots players = movables
+    let Movables nextBulletId bullets players = movables
         newPlayers = assignJoysticksToPlayers newJoysticks players
-    in  Match (Movables nextShotId shots newPlayers) obstacles
+    in  Match (Movables nextBulletId bullets newPlayers) obstacles
 
 assignJoysticksToPlayers
     :: [JoystickID] -> [IntersectedPlayer] -> [IntersectedPlayer]

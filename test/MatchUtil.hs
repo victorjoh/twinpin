@@ -2,7 +2,7 @@ module MatchUtil where
 
 import           Player
 import           Match
-import           Shot
+import           Bullet
 
 getFirstIntersectedPlayer :: Match -> IntersectedPlayer
 getFirstIntersectedPlayer (Match (Movables _ _ players) _) = head players
@@ -17,10 +17,10 @@ toPlayer (IntersectedPlayer _ player) = player
 getFirstPlayer :: Match -> Player
 getFirstPlayer match = toPlayer $ getFirstIntersectedPlayer match
 
-getFirstIntersecting :: Match -> [ShotId]
+getFirstIntersecting :: Match -> [BulletId]
 getFirstIntersecting match =
     let IntersectedPlayer intersecting _ = getFirstIntersectedPlayer match
     in  intersecting
 
-getShots :: Match -> [Shot]
-getShots (Match (Movables _ shots _) _) = shots
+getBullets :: Match -> [Bullet]
+getBullets (Match (Movables _ bullets _) _) = bullets

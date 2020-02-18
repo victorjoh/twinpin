@@ -8,7 +8,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 ### Added
-* Added player health and shot damage
+* Added player health and bullet damage
 
 ## [0.2.2] - 2020-02-14
 ### Fixed
@@ -29,7 +29,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 * Changed to fullscreen mode and made the aspect ratio a litter wider
 
 ### Added
-* Limited amount of shots per second for each player
+* Limited amount of bullets per second for each player
 * Players keep firing while trigger is pressed
 * Made the players have different colors
 * Players can now also fire using the right trigger
@@ -46,12 +46,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 * Two players that respond to gamepad input
   * They move on left thumbstick movement
   * They rotate on right thumbstick movement
-  * They fire a shot when the right bumber button is pressed
-* Shots turn red when passing through players
+  * They fire a bullet when the right bumber button is pressed
+* Bullets turn red when passing through players
 * Bounds, which are visualized by the window edges, limit the position of the
   players
 * Player to player collision
-* Pillars that limits the positions of the players and shots
+* Pillars that limits the positions of the players and bullets
 
 [Unreleased]: https://github.com/victorjoh/twinpin/compare/v0.2.2...HEAD
 [0.2.2]: https://github.com/victorjoh/twinpin/compare/v0.2.1...v0.2.2

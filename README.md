@@ -65,8 +65,8 @@ Below [Game] in the graph are:
 * [Match], which manages interations between all objects in a match.
 * [Menu], which can draw a pause menu that can be used to quit the game.
 * [Player], which updates a player's state. A player is represented by a circle
-  visually. Given the trigger input a player will fire a shot.
-* [Shot], which updates a shot's state. A shot is represented by a circle
+  visually. Given the trigger input a player will fire a bullet.
+* [Bullet], which updates a bullet's state. A bullet is represented by a circle
   visually.
 * [Circle], which contains most of the physics. It updates a circle's position
   given a velocity.
@@ -90,7 +90,7 @@ stack exec graphmod | tred | dot -Tsvg > doc/module-dependencies.svg
 [Match]:  src/Match.hs
 [Menu]:   src/Menu.hs
 [Player]: src/Player.hs
-[Shot]:   src/Shot.hs
+[Bullet]: src/Bullet.hs
 [Circle]: src/Circle.hs
 [Visual]: src/Visual.hs
 [Space]:  src/Space.hs

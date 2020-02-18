@@ -4,7 +4,7 @@ import           Space
 import           Circle
 import           CircleUtil
 import           Player
-import           Shot
+import           Bullet
 import           GHC.Int                        ( Int16 )
 import           SDL.Event
 import           Data.Word                      ( Word8

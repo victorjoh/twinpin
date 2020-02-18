@@ -7,8 +7,8 @@ import           Player
 import           PlayerUtil
 import           Circle
 import           Space
-import           Shot
-import           ShotUtil
+import           Bullet
+import           BulletUtil
 import           SDL
 import           MatchUtil
 import           Test.HUnit.Approx
@@ -26,19 +26,18 @@ spec = do
         $ it "converts from match to something that can be drawn by SDL"
         $ let player            = createPlayer (V2 48 350) 0 Red Nothing
               intersectedPlayer = IntersectedPlayer [] player
-              shot              = createShot (V2 100 200) 0 0
+              bullet            = createBullet (V2 100 200) 0 0
               pillar            = Circle (V2 60 70) 48
-              match = Match (Movables 1 [shot] [intersectedPlayer])
+              match = Match (Movables 1 [bullet] [intersectedPlayer])
                             (Obstacles (createBounds 800 600) [pillar])
             -- just test the order, the tests for the individual draw
             -- functions test that the position and rotation is right
-          in  map fst (drawMatch match)
-                  `shouldBe` map
-                                 fst
-                                 (  [drawShot shot]
-                                 ++ drawPlayer player
-                                 ++ [drawPillar pillar]
-                                 )
+          in  map fst (drawMatch match) `shouldBe` map
+                  fst
+                  (  [drawBullet bullet]
+                  ++ drawPlayer player
+                  ++ [drawPillar pillar]
+                  )
 
     describe "updateMatch" $ do
         let ?epsilon = 0.01
@@ -53,7 +52,7 @@ spec = do
                   new       = updateMatch [moveEvent] td old
               in
                   getPlayerPosition (getFirstPlayer new) @?~ V2 98 350
-        it "can create a shot"
+        it "can create a bullet"
             $ let
                   position  = V2 48 350
                   direction = 45
@@ -64,8 +63,8 @@ spec = do
                   triggerPressed = createTriggerEvent 0 JoyButtonPressed
                   new            = updateMatch [triggerPressed] 100 old
               in
-                  getShots new `shouldBe` [createShot position direction 8]
-        it "cannot create 2 shots from the same player in rapid succession"
+                  getBullets new `shouldBe` [createBullet position direction 8]
+        it "cannot create 2 bullets from the same player in rapid succession"
             $ let
                   player = IntersectedPlayer []
                       $ createPlayer (V2 48 350) 45 Red (Just 0)
@@ -76,104 +75,105 @@ spec = do
                   new            = updateMatch [triggerPressed] 1 between
               in
                   length (getFirstIntersecting new) `shouldBe` 1
-        it "can move a shot"
+        it "can move a bullet"
             $ let
-                  shot = createShot (V2 400 300) (pi / 2) 0
-                  old  = Match (Movables 1 [shot] [])
-                               (Obstacles (createBounds 800 600) [])
-                  td        = getShotMovementTime 50
+                  bullet = createBullet (V2 400 300) (pi / 2) 0
+                  old    = Match (Movables 1 [bullet] [])
+                                 (Obstacles (createBounds 800 600) [])
+                  td        = getBulletMovementTime 50
                   new       = updateMatch [] td old
                   -- expected y should be about 300 + 50 but calculate anyway
                   -- since time is not a float
-                  expectedY = 300 + fromIntegral td * shotSpeed
+                  expectedY = 300 + fromIntegral td * bulletSpeed
               in
-                  map getShotPosition (getShots new)
+                  map getBulletPosition (getBullets new)
                       `shouldBe` [V2 400 expectedY]
-        it "removes a shot if it is out of bounds"
+        it "removes a bullet if it is out of bounds"
             $ let bounds = createBounds 800 600
-                  shot   = createShot (V2 750 300) 0 0
-                  old    = Match (Movables 1 [shot] []) (Obstacles bounds [])
-                  td     = getShotMovementTime 100
-              in  getShots (updateMatch [] td old) `shouldBe` []
-        it "changes color of shots that hit players"
+                  bullet = createBullet (V2 750 300) 0 0
+                  old    = Match (Movables 1 [bullet] []) (Obstacles bounds [])
+                  td     = getBulletMovementTime 100
+              in  getBullets (updateMatch [] td old) `shouldBe` []
+        it "changes color of bullets that hit players"
             $ let
-                  shot   = createShot (V2 100 300) 0 0
+                  bullet = createBullet (V2 100 300) 0 0
                   player = IntersectedPlayer []
                       $ createPlayer (V2 200 300) 0 Red Nothing
-                  old = Match (Movables 1 [shot] [player])
+                  old = Match (Movables 1 [bullet] [player])
                               (Obstacles (createBounds 800 600) [])
-                  new = updateMatch [] (getShotMovementTime 100) old
+                  new = updateMatch [] (getBulletMovementTime 100) old
               in
-                  map getShotState (getShots new) `shouldBe` [HasHitPlayer]
-        it "decreases the health of a player that is hit by a shot"
+                  map getBulletState (getBullets new) `shouldBe` [HasHitPlayer]
+        it "decreases the health of a player that is hit by a bullet"
             $ let
-                  shot   = createShot (V2 100 300) 0 0
+                  bullet = createBullet (V2 100 300) 0 0
                   player = IntersectedPlayer []
                       $ createPlayer (V2 200 300) 0 Red Nothing
-                  old = Match (Movables 1 [shot] [player])
+                  old = Match (Movables 1 [bullet] [player])
                               (Obstacles (createBounds 800 600) [])
-                  new = updateMatch [] (getShotMovementTime 100) old
+                  new = updateMatch [] (getBulletMovementTime 100) old
               in
                   getHealth (getFirstPlayer new)
-                      `shouldBe` (playerMaxHealth - shotDamage)
+                      `shouldBe` (playerMaxHealth - bulletDamage)
         it
-                (  "changes color of shots that hit players even though they"
-                ++ " haven't left the barrel of the player triggering the shot"
+                (  "changes color of bullets that hit players even though they "
+                ++ "haven't left the barrel of the player triggering the bullet"
                 )
             $ let
-                  shot         = createShot (V2 400 300) 0 7
+                  bullet       = createBullet (V2 400 300) 0 7
                   sourcePlayer = IntersectedPlayer [7]
                       $ createPlayer (V2 400 300) 0 Red Nothing
                   targetPlayer = IntersectedPlayer
                       []
                       (createPlayer (V2 (400 + playerSide) 300) 0 Blue Nothing)
                   old = Match
-                      (Movables 8 [shot] [sourcePlayer, targetPlayer])
+                      (Movables 8 [bullet] [sourcePlayer, targetPlayer])
                       (Obstacles (createBounds 800 600) [])
-                  new = updateMatch [] (getShotMovementTime playerRadius) old
+                  new = updateMatch [] (getBulletMovementTime playerRadius) old
               in
-                  map getShotState (getShots new) `shouldBe` [HasHitPlayer]
+                  map getBulletState (getBullets new) `shouldBe` [HasHitPlayer]
         it
-                ("decreases the health of a player that is hit by a shot that is"
-                ++ " still in the barrel of another player"
+                (  "decreases the health of a player that is hit by a bullet "
+                ++ "that is still in the barrel of another player"
                 )
             $ let
-                  shot         = createShot (V2 400 300) 0 7
+                  bullet       = createBullet (V2 400 300) 0 7
                   sourcePlayer = IntersectedPlayer [7]
                       $ createPlayer (V2 400 300) 0 Red Nothing
                   targetPlayer = IntersectedPlayer
                       []
                       (createPlayer (V2 (400 + playerSide) 300) 0 Blue Nothing)
                   old = Match
-                      (Movables 8 [shot] [targetPlayer, sourcePlayer])
+                      (Movables 8 [bullet] [targetPlayer, sourcePlayer])
                       (Obstacles (createBounds 800 600) [])
-                  new = updateMatch [] (getShotMovementTime playerRadius) old
+                  new = updateMatch [] (getBulletMovementTime playerRadius) old
               in
                   getHealth (getFirstPlayer new)
-                      `shouldBe` (playerMaxHealth - shotDamage)
-        it "does not change the color of a shot that has not hit a player"
-            $ let
-                  shot   = createShot (V2 100 500) 0 0-- the shot will not hit
+                      `shouldBe` (playerMaxHealth - bulletDamage)
+        it "does not change the color of a bullet that has not hit a player"
+            $ let -- the bullet will not hit
+                  bullet = createBullet (V2 100 500) 0 0
                   player = IntersectedPlayer []
                       $ createPlayer (V2 200 300) 0 Red Nothing
-                  old = Match (Movables 1 [shot] [player])
+                  old = Match (Movables 1 [bullet] [player])
                               (Obstacles (createBounds 800 600) [])
-                  new = updateMatch [] (getShotMovementTime 100) old
+                  new = updateMatch [] (getBulletMovementTime 100) old
               in
-                  map getShotState (getShots new) `shouldBe` [HasNotHitPlayer]
-        it "does not decrease the health of the player if the shot missed"
-            $ let
-                  shot   = createShot (V2 100 500) 0 0 -- the shot will not hit
+                  map getBulletState (getBullets new)
+                      `shouldBe` [HasNotHitPlayer]
+        it "does not decrease the health of the player if the bullet missed"
+            $ let -- the bullet will not hit
+                  bullet = createBullet (V2 100 500) 0 0
                   player = IntersectedPlayer []
                       $ createPlayer (V2 200 300) 0 Red Nothing
-                  old = Match (Movables 1 [shot] [player])
+                  old = Match (Movables 1 [bullet] [player])
                               (Obstacles (createBounds 800 600) [])
-                  new = updateMatch [] (getShotMovementTime 100) old
+                  new = updateMatch [] (getBulletMovementTime 100) old
               in
                   getHealth (getFirstPlayer new) `shouldBe` playerMaxHealth
         it
-                ("does not hit a player with their own shot if the shot has not "
-                ++ "left the barrel"
+                (  "does not hit a player with their own bullet if the bullet "
+                ++ "has not left the barrel"
                 )
             $ let
                   player = IntersectedPlayer []
@@ -185,39 +185,39 @@ spec = do
               in
                   getHealth (getFirstPlayer new) `shouldBe` playerMaxHealth
         it
-                ("does not hit a player more than once when a shot is passing "
-                ++ "through them"
+                ("does not hit a player more than once when a bullet is "
+                ++"passing through them"
                 )
             $ let
-                  shot   = createShot (V2 100 300) 0 0
+                  bullet = createBullet (V2 100 300) 0 0
                   player = IntersectedPlayer []
                       $ createPlayer (V2 200 300) 0 Red Nothing
-                  old = Match (Movables 1 [shot] [player])
+                  old = Match (Movables 1 [bullet] [player])
                               (Obstacles (createBounds 800 600) [])
                   new = updateMatch [] 1
-                      $ updateMatch [] (getShotMovementTime 100) old
+                      $ updateMatch [] (getBulletMovementTime 100) old
               in
                   getHealth (getFirstPlayer new)
-                      `shouldBe` (playerMaxHealth - shotDamage)
+                      `shouldBe` (playerMaxHealth - bulletDamage)
         it
-                (  "if a shot passes through two players at the same time, "
-                ++ "neither of them is hit more than once while the shot is "
+                (  "if a bullet passes through two players at the same time, "
+                ++ "neither of them is hit more than once while the bullet is "
                 ++ "passing through them"
                 )
             $ let
-                  shot = createShot (V2 100 300) 0 0
+                  bullet = createBullet (V2 100 300) 0 0
                   players =
                       [ createPlayer (V2 200 (300 - playerRadius)) 0 Red Nothing
                       , createPlayer (V2 200 (300 + playerRadius)) 0 Red Nothing
                       ]
                   old = Match
-                      (Movables 1 [shot] $ map (IntersectedPlayer []) players)
+                      (Movables 1 [bullet] $ map (IntersectedPlayer []) players)
                       (Obstacles (createBounds 800 600) [])
                   new = updateMatch [] 1
-                      $ updateMatch [] (getShotMovementTime 100) old
+                      $ updateMatch [] (getBulletMovementTime 100) old
               in
                   map getHealth (getPlayers new)
-                      `shouldBe` replicate 2 (playerMaxHealth - shotDamage)
+                      `shouldBe` replicate 2 (playerMaxHealth - bulletDamage)
         it "can collide two players"
             $ let
                   player1 = createPlayer (V2 100 300) 0 Red (Just 0)
@@ -241,14 +241,14 @@ spec = do
                   new = updateMatch [createMoveRightEvent 0 200 1000] 1000 old
               in  getPlayerPosition (getFirstPlayer new)
                       `shouldBe` (V2 (200 - pillarRadius - playerRadius) 300)
-        it "removes a shot that has hit a pillar"
+        it "removes a bullet that has hit a pillar"
             $ let pillar = Circle (V2 200 300) 48
                   old    = Match
-                      (Movables 1 [createShot (V2 200 300) 0 0] [])
-                                -- use wide bounds to make sure the shot is not
+                      (Movables 1 [createBullet (V2 200 300) 0 0] [])
+                                -- use wide bounds to make sure the bullet is not
                                 -- removed because it is outside the bounds
                       (Obstacles (createBounds 100000 600) [pillar])
-              in  getShots (updateMatch [] 1000 old) `shouldBe` []
+              in  getBullets (updateMatch [] 1000 old) `shouldBe` []
 
     describe "assignJoysticksToMatch" $ do
         let

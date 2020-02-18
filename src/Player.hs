@@ -7,14 +7,14 @@ module Player
     , playerMaxHealth
     , ReloadTime
     , playerSide
-    , minShotInterval
+    , minFiringInterval
     , playerSize
     , createPlayer
     , staticPlayerImage
     , drawPlayer
     , axisPositionToVelocity
     , updatePlayer
-    , triggerShot
+    , fireBullet
     , playerToCircle
     , setGun
     , triggerMinFireValue
@@ -28,7 +28,7 @@ module Player
 where
 
 import           Space
-import           Shot
+import           Bullet
 import           Circle
 import           Visual
 import           SDL
@@ -69,8 +69,8 @@ playerSide = 60
 playerRadius :: Radius
 playerRadius = playerSide / 2
 
-minShotInterval :: ReloadTime
-minShotInterval = 250
+minFiringInterval :: ReloadTime
+minFiringInterval = 250
 
 axisPositionToVelocity :: Float
 axisPositionToVelocity = 0.000018
@@ -161,7 +161,7 @@ squareSector a
 
 reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
 reloadTimeToAimShadowLength maxShadowWidth reloadTime =
-    maxShadowWidth * fromIntegral reloadTime / fromIntegral minShotInterval
+    maxShadowWidth * fromIntegral reloadTime / fromIntegral minFiringInterval
 
 aimColor :: PlayerId -> PixelRGBA8
 aimColor Red  = PixelRGBA8 0x5F 0x5F 0xD3 255
@@ -236,18 +236,21 @@ updateVelocity (V2 x y) (axisId, axisPos) =
             1 -> createVelocity x newV
             _ -> V2 x y
 
-triggerShot :: [Event] -> ShotId -> Player -> (Player, Maybe Shot)
-triggerShot events shotId player =
+fireBullet :: [Event] -> BulletId -> Player -> (Player, Maybe Bullet)
+fireBullet events bulletId player =
     let
         Player (Circle position _) _ gun _ _ maybeJoystickId = player
         Gun aim reloadTime state = gun
         Aim2D _ _ direction = aim
         newState = getGunState state maybeJoystickId events
-        (newReloadTime, maybeShot) = if reloadTime == 0 && newState == Firing
-            then (minShotInterval, Just $ createShot position direction shotId)
+        (newReloadTime, maybeBullet) = if reloadTime == 0 && newState == Firing
+            then
+                ( minFiringInterval
+                , Just $ createBullet position direction bulletId
+                )
             else (reloadTime, Nothing)
     in
-        (setGun (Gun aim newReloadTime newState) player, maybeShot)
+        (setGun (Gun aim newReloadTime newState) player, maybeBullet)
 
 getGunState :: GunState -> Maybe JoystickID -> [Event] -> GunState
 getGunState gunState (Just joystickId) events =
