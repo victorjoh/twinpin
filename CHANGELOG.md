@@ -8,7 +8,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 ### Added
-* Added player health and bullet damage
+* Added player health and bullet damage. Player health is represented by a
+  circle sector on the player visual.
+* Game is now over when a player's lives are depleted. Each player starts with 5
+  lives. When the game is over, a menu is show where you can either restart or
+  quit.
 
 ## [0.2.2] - 2020-02-14
 ### Fixed

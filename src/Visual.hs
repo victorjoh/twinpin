@@ -29,6 +29,10 @@ type ImageId = String
 data VectorImage = VectorImage Size2D PixelRGBA8 (Drawing PixelRGBA8 ())
 type ScaleRatio = Float
 
+instance Show VectorImage where
+    show (VectorImage size color _) =
+        "VectorImage (" ++ show size ++ ") (" ++ show color ++ ") _"
+
 transparent :: PixelRGBA8
 transparent = PixelRGBA8 255 255 255 0
 

@@ -11,6 +11,7 @@ import           Player
 import           Menu
 import           PlayerUtil
 import           MenuUtil
+import           BulletUtil
 import           Visual
 import           SDL                     hiding ( Paused )
 import           SDL.Internal.Types             ( Window(..) )
@@ -35,9 +36,13 @@ spec = do
                       (drawGame (V2 1920 1080) (Game 0 (Running emptyMatch)))
                   `shouldBe` [Rectangle (P (V2 0 0)) (V2 1920 1080)]
         it "draws the match and the menu on top when paused"
-            $ let game = Game 0 (Paused emptyMatch Resume [])
+            $ let
+                  game = Game
+                      0
+                      (Interrupted emptyMatch Paused (basicMenu Continue) [])
               in  map fst (drawGame (V2 1920 1080) game)
-                  `shouldBe` map (fmap round . fst) (drawMenu Resume)
+                  `shouldBe` map (fmap round . fst)
+                                 (drawMenu (basicMenu Continue))
                   ++         [Rectangle (P (V2 0 0)) (V2 1920 1080)]
         it "only draws the bounds when the game is shut down"
             $          map fst (drawGame (V2 1920 1080) (Game 0 Finished))
@@ -46,27 +51,36 @@ spec = do
                 ("offsets the x position of the menu if the screen has a wider "
                 ++ "aspect ratio than the match"
                 )
-            $ let game = Game 0 (Paused emptyMatch Resume [])
+            $ let
+                  game = Game
+                      0
+                      (Interrupted emptyMatch Paused (basicMenu Continue) [])
               in  map fst (drawGame (V2 3840 1080) game)
                   `shouldBe` map
                                  (fmap round . moveRectangle (V2 960 0) . fst)
-                                 (drawMenu Resume)
+                                 (drawMenu (basicMenu Continue))
                   ++         [Rectangle (P (V2 0 0)) (V2 3840 1080)]
         it
                 (  "offsets the y position of the menu if the screen has a "
                 ++ "narrower aspect ratio than the match"
                 )
-            $ let game = Game 0 (Paused emptyMatch Resume [])
+            $ let
+                  game = Game
+                      0
+                      (Interrupted emptyMatch Paused (basicMenu Continue) [])
               in  map fst (drawGame (V2 1920 2160) game)
                   `shouldBe` map
                                  (fmap round . moveRectangle (V2 0 540) . fst)
-                                 (drawMenu Resume)
+                                 (drawMenu (basicMenu Continue))
                   ++         [Rectangle (P (V2 0 0)) (V2 1920 2160)]
         it "scales the menu if the window is higher resolution than the match"
-            $ let game = Game 0 (Paused emptyMatch Resume [])
+            $ let
+                  game = Game
+                      0
+                      (Interrupted emptyMatch Paused (basicMenu Continue) [])
               in  map fst (drawGame (V2 3840 2160) game)
                   `shouldBe` map (fmap round . scaleRectangle 2 . fst)
-                                 (drawMenu Resume)
+                                 (drawMenu (basicMenu Continue))
                   ++         [Rectangle (P (V2 0 0)) (V2 3840 2160)]
 
     describe "updateGame" $ do
@@ -99,12 +113,26 @@ spec = do
             $ let optionsPressed = createButtonPressedEvent 0 9
                   game           = Game 0 $ Running emptyMatch
               in  updateGame [optionsPressed] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Resume [])
+                      `shouldBe` Game
+                                     1
+                                     (Interrupted
+                                         emptyMatch
+                                         Paused
+                                         (pauseMenu Continue)
+                                         []
+                                     )
         it "opens the pause menu when the ps button is pressed"
             $ let psPressed = createButtonPressedEvent 0 10
                   game      = Game 0 $ Running emptyMatch
               in  updateGame [psPressed] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Resume [])
+                      `shouldBe` Game
+                                     1
+                                     (Interrupted
+                                         emptyMatch
+                                         Paused
+                                         (pauseMenu Continue)
+                                         []
+                                     )
         it "opens the pause menu when escape is pressed"
             $ let escPressed = toEvent $ KeyboardEventData
                       Nothing
@@ -113,21 +141,159 @@ spec = do
                       (Keysym (Scancode 41) (Keycode 27) noKeyModifier)
                   game = Game 0 $ Running emptyMatch
               in  updateGame [escPressed] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Resume [])
+                      `shouldBe` Game
+                                     1
+                                     (Interrupted
+                                         emptyMatch
+                                         Paused
+                                         (pauseMenu Continue)
+                                         []
+                                     )
+        it "opens the win screen for red when red wins"
+            $ let
+                  red = createPlayer (V2 200 200) 0 Red Nothing
+                  blue =
+                      setHealth (bulletDamage / 2)
+                          $ setDeaths (playerLives - 1)
+                          $ createPlayer (V2 500 500) 0 Blue Nothing
+                  bullet = createBullet (V2 400 500) 0 0
+                  td     = getBulletMovementTime 100
+                  match  = Match
+                      ( Movables 1 [bullet]
+                      $ map (IntersectedPlayer []) [red, blue]
+                      )
+                      (Obstacles (createBounds 1920 1080) [])
+                  game = Game 0 $ Running match
+              in
+                  updateGame [] td game `shouldBe` Game
+                      td
+                      (Interrupted
+                          (Match
+                              (Movables
+                                  1
+                                  [setBulletHit $ updateBullet td bullet]
+                                  [ IntersectedPlayer [] red
+                                  , IntersectedPlayer [0]
+                                  $ setHealth playerMaxHealth
+                                  $ setDeaths playerLives blue
+                                  ]
+                              )
+                              (Obstacles (createBounds 1920 1080) [])
+                          )
+                          GameOver
+                          (redWinMenu Continue)
+                          []
+                      )
+        it "opens the win screen for blue when blue wins"
+            $ let red =
+                      setHealth (bulletDamage / 2)
+                          $ setDeaths (playerLives - 1)
+                          $ createPlayer (V2 500 500) 0 Red Nothing
+                  blue   = createPlayer (V2 200 200) 0 Blue Nothing
+                  bullet = createBullet (V2 400 500) 0 0
+                  td     = getBulletMovementTime 100
+                  match  = Match
+                      ( Movables 1 [bullet]
+                      $ map (IntersectedPlayer []) [red, blue]
+                      )
+                      (Obstacles (createBounds 1920 1080) [])
+                  game = Game 0 $ Running match
+              in  updateGame [] td game `shouldBe` Game
+                      td
+                      (Interrupted
+                          (Match
+                              (Movables
+                                  1
+                                  [setBulletHit $ updateBullet td bullet]
+                                  [ IntersectedPlayer [0]
+                                  $ setHealth playerMaxHealth
+                                  $ setDeaths playerLives red
+                                  , IntersectedPlayer [] blue
+                                  ]
+                              )
+                              (Obstacles (createBounds 1920 1080) [])
+                          )
+                          GameOver
+                          (blueWinMenu Continue)
+                          []
+                      )
+        it "opens the tie screen when it is a draw"
+            $ let red   = createPlayer (V2 200 200) 0 Red Nothing
+                  b1    = createBullet (V2 100 200) 0 0
+                  blue  = createPlayer (V2 500 500) 0 Blue Nothing
+                  b2    = createBullet (V2 400 500) 0 1
+                  td    = getBulletMovementTime 100
+                  match = Match
+                      (Movables 2 [b1, b2] $ map
+                          ( IntersectedPlayer []
+                          . setHealth (bulletDamage / 2)
+                          . setDeaths (playerLives - 1)
+                          )
+                          [red, blue]
+                      )
+                      (Obstacles (createBounds 1920 1080) [])
+                  game = Game 0 $ Running match
+              in  updateGame [] td game `shouldBe` Game
+                      td
+                      (Interrupted
+                          (Match
+                              (Movables
+                                  2
+                                  (map (setBulletHit . updateBullet td) [b1, b2]
+                                  )
+                                  ( zipWith
+                                          (\bulletId ->
+                                              IntersectedPlayer [bulletId]
+                                          )
+                                          [0, 1]
+                                  $ map (setDeaths playerLives) [red, blue]
+                                  )
+                              )
+                              (Obstacles (createBounds 1920 1080) [])
+                          )
+                          GameOver
+                          (tieMenu Continue)
+                          []
+                      )
         it
                 (  "resumes the match when the x button is pressed when resume "
-                ++ "is selected in the menu"
+                ++ "is selected in the pause menu"
                 )
-            $ let xPressed = createButtonPressedEvent 0 0
-                  game     = Game 0 $ Paused emptyMatch Resume []
-              in  updateGame [xPressed] 1 game
+            $ let
+                  xPressed = createButtonPressedEvent 0 0
+                  game     = Game 0 $ Interrupted emptyMatch
+                                                  Paused
+                                                  (basicMenu Continue)
+                                                  []
+              in
+                  updateGame [xPressed] 1 game
                       `shouldBe` Game 1 (Running emptyMatch)
+        it
+                (  "restarts the match when the x button is pressed when "
+                ++ "restart is selected in the game over menu"
+                )
+            $ let
+                  match =
+                      updateMatch [createTriggerEvent 5 JoyButtonPressed] 100
+                          $ assignJoysticksToMatch [5, 7] createMatch
+                  xPressed = createButtonPressedEvent 0 0
+                  game     = Game 0
+                      $ Interrupted match GameOver (redWinMenu Continue) []
+              in
+                  updateGame [xPressed] 1 game
+                      `shouldBe` Game
+                                     1
+                                     (Running $ assignJoysticksToMatch
+                                         [5, 7]
+                                         createMatch
+                                     )
         it
                 (  "quits the game when the x button is pressed when quit is "
                 ++ "selected in the menu"
                 )
             $ let xPressed = createButtonPressedEvent 0 0
-                  game     = Game 0 $ Paused emptyMatch Quit []
+                  game =
+                      Game 0 $ Interrupted emptyMatch Paused (basicMenu Quit) []
               in  updateGame [xPressed] 1 game `shouldBe` Game 1 Finished
         it
                 (  "quits the game when enter is pressed when quit is selected "
@@ -138,22 +304,43 @@ spec = do
                       Pressed
                       False
                       (Keysym (Scancode 40) (Keycode 13) noKeyModifier)
-                  game = Game 0 $ Paused emptyMatch Quit []
+                  game =
+                      Game 0 $ Interrupted emptyMatch Paused (basicMenu Quit) []
               in  updateGame [enterPressed] 1 game `shouldBe` Game 1 Finished
         it "moves the selection down when the left thumbstick is moved down"
-            $ let stickDown = toEvent $ JoyAxisEventData 0 1 30000
-                  game      = Game 0 $ Paused emptyMatch Resume []
-              in  updateGame [stickDown] 1 game
-                      `shouldBe` Game 1 (Paused emptyMatch Quit [stickDown])
+            $ let
+                  stickDown = toEvent $ JoyAxisEventData 0 1 30000
+                  game      = Game 0 $ Interrupted emptyMatch
+                                                   Paused
+                                                   (basicMenu Continue)
+                                                   []
+              in
+                  updateGame [stickDown] 1 game
+                      `shouldBe` Game
+                                     1
+                                     (Interrupted
+                                         emptyMatch
+                                         Paused
+                                         (basicMenu Quit)
+                                         [stickDown]
+                                     )
         it "does not update the match while the game is paused"
             $ let
                   bullet = createBullet (V2 100 300) 0 0
                   match  = Match (Movables 1 [bullet] [])
                                  (Obstacles (createBounds 1920 1080) [])
-                  game = Game 0 $ Paused match Resume []
+                  game = Game 0
+                      $ Interrupted match Paused (basicMenu Continue) []
               in
                   updateGame [] 50 game
-                      `shouldBe` Game 50 (Paused match Resume [])
+                      `shouldBe` Game
+                                     50
+                                     (Interrupted
+                                         match
+                                         Paused
+                                         (basicMenu Continue)
+                                         []
+                                     )
         it
                 ("keeps track of thumbstick movements while the game is paused "
                 ++ "so the players are given the correct initial velocity when "
@@ -164,7 +351,8 @@ spec = do
                   match  = Match
                       (Movables 0 [] [IntersectedPlayer [] player])
                       (Obstacles (createBounds 1920 1080) [])
-                  game              = Game 0 $ Paused match Resume []
+                  game =
+                      Game 0 $ Interrupted match Paused (basicMenu Continue) []
                   moveRight         = createMoveRightEvent 0 50 200
                   pausedGame        = updateGame [moveRight] 999 game
                   xPressed          = createButtonPressedEvent 0 0
@@ -184,8 +372,9 @@ spec = do
                   bulletsToMatch bullets = Match
                       (Movables 0 bullets [IntersectedPlayer [] player])
                       (Obstacles (createBounds 1920 1080) [])
-                  match             = bulletsToMatch []
-                  game              = Game 0 $ Paused match Resume []
+                  match = bulletsToMatch []
+                  game =
+                      Game 0 $ Interrupted match Paused (basicMenu Continue) []
                   triggerPressed    = createTriggerEvent 0 JoyButtonPressed
                   pausedGame        = updateGame [triggerPressed] 999 game
                   xPressed          = createButtonPressedEvent 0 0
@@ -206,7 +395,8 @@ spec = do
                   match  = Match
                       (Movables 0 [] [IntersectedPlayer [] player])
                       (Obstacles (createBounds 1920 1080) [])
-                  game              = Game 0 $ Paused match Resume []
+                  game =
+                      Game 0 $ Interrupted match Paused (basicMenu Continue) []
                   triggerPressed    = createTriggerEvent 0 JoyButtonPressed
                   firstPressed      = updateGame [triggerPressed] 500 game
                   triggerReleased   = createTriggerEvent 0 JoyButtonReleased
@@ -221,17 +411,21 @@ spec = do
                 ("respects the sequential order of the supplied events when in "
                 ++ "the menu"
                 )
-            $ let game     = Game 0 $ Paused emptyMatch Resume []
+            $ let
+                  game = Game 0 $ Interrupted emptyMatch
+                                              Paused
+                                              (basicMenu Continue)
+                                              []
                   moveDown = toEvent $ JoyHatEventData 0 0 HatDown
                   moveUp   = toEvent $ JoyHatEventData 0 0 HatUp
-              in  updateGame [moveDown, moveUp] 1 game
-                      `shouldBe` Game
-                                     1
-                                     (Paused
-                                         emptyMatch
-                                         Resume
-                                         [moveDown, moveUp]
-                                     )
+              in
+                  updateGame [moveDown, moveUp] 1 game `shouldBe` Game
+                      1
+                      (Interrupted emptyMatch
+                                   Paused
+                                   (basicMenu Continue)
+                                   [moveDown, moveUp]
+                      )
 
     describe "assignJoysticks" $ do
         let player = IntersectedPlayer [] (createPlayer (V2 0 0) 0 Red Nothing)
@@ -242,8 +436,10 @@ spec = do
                   Game _ (Running newMatch) = assignJoysticks [1] game
               in  getJoystickId (getFirstPlayer newMatch) `shouldBe` Just 1
         it "assigns joysticks to the match when paused"
-            $ let game                         = Game 0 $ Paused match Resume []
-                  Game _ (Paused newMatch _ _) = assignJoysticks [1] game
+            $ let game =
+                      Game 0 $ Interrupted match Paused (basicMenu Continue) []
+                  Game _ (Interrupted newMatch _ _ _) =
+                      assignJoysticks [1] game
               in  getJoystickId (getFirstPlayer newMatch) `shouldBe` Just 1
         it "does nothing when the game is already finished"
             $          assignJoysticks [1] (Game 0 Finished)

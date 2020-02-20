@@ -12,55 +12,72 @@ import qualified Graphics.Rasterific           as Rasterific
 import           Graphics.Rasterific.Texture
 import           Data.List                      ( foldl' )
 
-data Menu = Resume | Quit deriving (Show, Eq)
+type Header = [(String, PixelRGBA8)]
+type ContinueName = String
+data Selection = Continue | Quit deriving (Show, Eq)
+data Menu = Menu Header ContinueName Selection deriving (Show, Eq)
 
 menuSize :: Size2D
 menuSize = V2 540 414
 
-menuImageId = "menu"
+defaultTextColor = PixelRGBA8 0xE6 0xE6 0xE6 255
 
-getStaticMenuImage :: Font -> (ImageId, VectorImage)
-getStaticMenuImage font =
-    let menuLine x y = printTextAt font (PointSize 54) (Rasterific.V2 x y)
-    in  ( menuImageId
+getMenuImageId :: Header -> ImageId
+getMenuImageId header = "menu-" ++ concatMap fst header
+
+getStaticMenuImage :: Font -> Menu -> (ImageId, VectorImage)
+getStaticMenuImage font (Menu header continueName _) =
+    let
+        textSize = PointSize 54
+        menuLine x y = printTextAt font textSize (Rasterific.V2 x y)
+    in
+        ( getMenuImageId header
         , VectorImage menuSize (backgroundColorAlpha 120)
-            $ withTexture (uniformTexture $ PixelRGBA8 0xE6 0xE6 0xE6 255)
-            $ do
-                  menuLine 90  135 "paused"
-                  menuLine 144 225 "resume"
-                  menuLine 144 315 "quit"
+        $ withTexture (uniformTexture defaultTextColor)
+        $ do
+              printTextRanges (Rasterific.V2 90 135) $ map
+                  (\(text, color) -> TextRange font
+                                               textSize
+                                               text
+                                               (Just $ uniformTexture color)
+                  )
+                  header
+              menuLine 144 225 continueName
+              menuLine 144 315 "quit"
         )
 
 drawMenu :: Menu -> [(Rectangle Float, Either VectorImage ImageId)]
-drawMenu menu =
-    let selectionPosition = if menu == Resume then 540 else 630
-    in  [ (Rectangle (P $ V2 690 333) menuSize, Right menuImageId)
+drawMenu (Menu header _ selection) =
+    let selectionPosition = if selection == Continue then 540 else 630
+    in  [ (Rectangle (P $ V2 690 333) menuSize, Right $ getMenuImageId header)
         , drawBullet $ createBullet (V2 807 selectionPosition) 0 (-1)
         ]
 
-updateMenu :: [Event] -> Menu -> Menu
-updateMenu events menu = foldl' eventToMenu menu events
+updateSelection :: [Event] -> Menu -> Menu
+updateSelection events (Menu header continueName previous) =
+    Menu header continueName $ foldl' eventToSelection previous events
 
-eventToMenu :: Menu -> Event -> Menu
-eventToMenu fallback (Event _ (JoyAxisEvent axisEventData)) =
+eventToSelection :: Selection -> Event -> Selection
+eventToSelection fallback (Event _ (JoyAxisEvent axisEventData)) =
     let JoyAxisEventData _ axisId axisPos = axisEventData
         noiseThreshold                    = 5000
     in  if axisId == 1
             then if axisPos < -noiseThreshold
-                then Resume
+                then Continue
                 else if axisPos > noiseThreshold then Quit else fallback
             else fallback
-eventToMenu fallback (Event _ (JoyHatEvent (JoyHatEventData _ _ hatPosition)))
-    = case hatPosition of
-        HatUp   -> Resume
-        HatDown -> Quit
-        _       -> fallback
-eventToMenu fallback (Event _ (KeyboardEvent eventData)) =
+eventToSelection fallback (Event _ (JoyHatEvent hatEventData)) =
+    let JoyHatEventData _ _ hatPosition = hatEventData
+    in  case hatPosition of
+            HatUp   -> Continue
+            HatDown -> Quit
+            _       -> fallback
+eventToSelection fallback (Event _ (KeyboardEvent eventData)) =
     let KeyboardEventData _ motion _ (Keysym (Scancode code) _ _) = eventData
     in  if motion == Pressed
             then case code of
-                82 -> Resume
+                82 -> Continue
                 81 -> Quit
                 _  -> fallback
             else fallback
-eventToMenu fallback _ = fallback
+eventToSelection fallback _ = fallback

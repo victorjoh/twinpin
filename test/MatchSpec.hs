@@ -12,6 +12,7 @@ import           BulletUtil
 import           SDL
 import           MatchUtil
 import           Test.HUnit.Approx
+import           VisualUtil                     ( )
 
 spec :: Spec
 spec = do
@@ -22,22 +23,53 @@ spec = do
               angle1 : angle2 : _ = angles
           in  abs (angleDifference2D angle1 angle2) `shouldBe` pi
 
-    describe "drawMatch"
-        $ it "converts from match to something that can be drawn by SDL"
-        $ let player            = createPlayer (V2 48 350) 0 Red Nothing
-              intersectedPlayer = IntersectedPlayer [] player
-              bullet            = createBullet (V2 100 200) 0 0
-              pillar            = Circle (V2 60 70) 48
-              match = Match (Movables 1 [bullet] [intersectedPlayer])
-                            (Obstacles (createBounds 800 600) [pillar])
-            -- just test the order, the tests for the individual draw
-            -- functions test that the position and rotation is right
-          in  map fst (drawMatch match) `shouldBe` map
-                  fst
-                  (  [drawBullet bullet]
-                  ++ drawPlayer player
-                  ++ [drawPillar pillar]
-                  )
+    describe "drawMatch" $ do
+        it "converts from match to something that can be drawn by SDL"
+            $ let player            = createPlayer (V2 48 350) 0 Red Nothing
+                  intersectedPlayer = IntersectedPlayer [] player
+                  bullet            = createBullet (V2 100 200) 0 0
+                  pillar            = Circle (V2 60 70) 48
+                  match = Match (Movables 1 [bullet] [intersectedPlayer])
+                                (Obstacles (createBounds 800 600) [pillar])
+                  -- just test the order, the tests for the individual draw
+                  -- functions test that the position is right
+              in  map fst (drawMatch match) `shouldBe` map
+                      fst
+                      (  [drawBullet bullet]
+                      ++ drawPlayer player
+                      ++ [drawPillar pillar]
+                      ++ drawScore (V2 60 70) player
+                      )
+        it "draws the score on the pillars"
+            $ let
+                  pillars =
+                      [ Circle (V2 100 100) 48
+                      , Circle (V2 800 100) 48
+                      , Circle (V2 100 800) 48
+                      ]
+                  players =
+                      [ IntersectedPlayer []
+                            $ createPlayer (V2 400 400) 0 color Nothing
+                      | color <- [Red, Blue, Red]
+                      ]
+                  match = Match
+                      (Movables 0 [] players)
+                      (Obstacles (createBounds 1920 1080) pillars)
+              in
+                  drawMatch match
+                      `shouldContain` [ ( Rectangle (P $ V2 82.5 77.5)
+                                                    (V2 35.0 45.0)
+                                        , Right "Red5"
+                                        )
+                                      , ( Rectangle (P $ V2 782.5 77.5)
+                                                    (V2 35.0 45.0)
+                                        , Right "Blue5"
+                                        )
+                                      , ( Rectangle (P $ V2 82.5 777.5)
+                                                    (V2 35.0 45.0)
+                                        , Right "Red5"
+                                        )
+                                      ]
 
     describe "updateMatch" $ do
         let ?epsilon = 0.01
@@ -185,8 +217,8 @@ spec = do
               in
                   getHealth (getFirstPlayer new) `shouldBe` playerMaxHealth
         it
-                ("does not hit a player more than once when a bullet is "
-                ++"passing through them"
+                (  "does not hit a player more than once when a bullet is "
+                ++ "passing through them"
                 )
             $ let
                   bullet = createBullet (V2 100 300) 0 0
@@ -278,3 +310,105 @@ spec = do
         it "only assigns to those that does not already have a joystick"
             $          updateWith [Just 1, Nothing, Just 2, Nothing] [3, 4]
             `shouldBe` [Just 1, Just 3, Just 2, Just 4]
+
+    describe "getWinners" $ do
+        context "when there are two players" $ do
+            context "when both players have reached zero lives" $ do
+                let p1 = setDeaths playerLives
+                        $ createPlayer (V2 0 0) 0 Blue Nothing
+                    p2 = setDeaths playerLives
+                        $ createPlayer (V2 0 0) 0 Red Nothing
+                    match = Match
+                        (Movables 0 [] (map (IntersectedPlayer []) [p1, p2]))
+                        (Obstacles (createBounds 800 600) [])
+                it "returns both players' colors"
+                    $          getWinners match
+                    `shouldBe` [Blue, Red]
+            context "when one player have reached zero lives" $ do
+                let p1 = setDeaths playerLives
+                        $ createPlayer (V2 0 0) 0 Blue Nothing
+                    p2    = createPlayer (V2 0 0) 0 Red Nothing
+                    match = Match
+                        (Movables 0 [] (map (IntersectedPlayer []) [p1, p2]))
+                        (Obstacles (createBounds 800 600) [])
+                it "returns the other player's color"
+                    $          getWinners match
+                    `shouldBe` [Red]
+            context "when none of the players have reached zero lives" $ do
+                let p1    = createPlayer (V2 0 0) 0 Blue Nothing
+                    p2    = createPlayer (V2 0 0) 0 Red Nothing
+                    match = Match
+                        (Movables 0 [] (map (IntersectedPlayer []) [p1, p2]))
+                        (Obstacles (createBounds 800 600) [])
+                it "returns an empty list" $ getWinners match `shouldBe` []
+        context "when there are three players"
+            $ context "when one player have reached zero lives"
+            $ do
+                  let
+                      p1 = setDeaths playerLives
+                          $ createPlayer (V2 0 0) 0 Blue Nothing
+                  context
+                          (  "when the remaining players have different amount "
+                          ++ "of lives"
+                          )
+                      $ do
+                            let p2 = createPlayer (V2 0 0) 0 Red Nothing
+                                p3 = setDeaths 1
+                                    $ createPlayer (V2 0 0) 0 Blue Nothing
+                                match = Match
+                                    ( Movables 0 []
+                                    $ map
+                                          (IntersectedPlayer [])
+                                          [p1, p2, p3]
+                                    )
+                                    (Obstacles (createBounds 800 600) [])
+                            it "returns the player with the most lives"
+                                $          getWinners match
+                                `shouldBe` [Red]
+                  context
+                          (  "when the remaining players have the same amount "
+                          ++ "of lives"
+                          )
+                      $ do
+                            let p2    = createPlayer (V2 0 0) 0 Red Nothing
+                                p3    = createPlayer (V2 0 0) 0 Red Nothing
+                                match = Match
+                                    ( Movables 0 []
+                                    $ map
+                                          (IntersectedPlayer [])
+                                          [p1, p2, p3]
+                                    )
+                                    (Obstacles (createBounds 800 600) [])
+                            it "returns the remaining players"
+                                $          getWinners match
+                                `shouldBe` [Red, Red]
+
+    describe "setPlayerIds" $ do
+        it "sets the players' IDs in consecutive order"
+            $ let playerIds = [PlayerId Red (Just 0), PlayerId Red (Just 1)]
+              in  getPlayerIds (setPlayerIds playerIds createMatch)
+                      `shouldBe` playerIds
+        it
+                (  "only sets the IDs for the first players when the number of "
+                ++ "IDs are less than the number of players"
+                )
+            $ let playerIds = [PlayerId Red (Just 0)]
+              in  getPlayerIds (setPlayerIds playerIds createMatch)
+                  `shouldBe` playerIds
+                  ++         [PlayerId Red Nothing]
+        it
+                (  "only sets the first IDs provided when the number of IDs are"
+                ++ " more than the number of players"
+                )
+            $ let playerIds =
+                      [ PlayerId Red  (Just 0)
+                      , PlayerId Red  (Just 1)
+                      , PlayerId Blue (Just 2)
+                      ]
+              in  getPlayerIds (setPlayerIds playerIds createMatch)
+                      `shouldBe` take 2 playerIds
+
+    describe "getPlayerIds"
+        $          it "gets the player IDs"
+        $          getPlayerIds (assignJoysticksToMatch [0] createMatch)
+        `shouldBe` [PlayerId Blue (Just 0), PlayerId Red Nothing]

@@ -265,7 +265,7 @@ spec = do
               in
                   maybeBullet `shouldSatisfy` isJust
         it
-                ("does not fire a bullet if the right trigger button is not"
+                (  "does not fire a bullet if the right trigger button is not"
                 ++ " pressed far enough"
                 )
             $ let
@@ -412,4 +412,10 @@ spec = do
         it "resets the players health to max if health is reduced below zero"
             $ let old = setHealth 0.05 $ createPlayer (V2 0 0) 0 Red Nothing
               in  getHealth (inflictDamage 0.15 old) `shouldBe` playerMaxHealth
+        it
+                (  "increases the player's number of deaths by 1 when their "
+                ++ "health is depleted"
+                )
+            $ let old = setHealth 0.05 $ createPlayer (V2 0 0) 0 Red Nothing
+              in  getDeaths (inflictDamage 0.15 old) `shouldBe` 1
 

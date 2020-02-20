@@ -7,11 +7,16 @@ module Match
     , pillarColor
     , createMatch
     , drawPillar
+    , drawScore
     , matchSize
     , staticMatchImages
     , drawMatch
     , updateMatch
     , assignJoysticksToMatch
+    , getWinners
+    , getPlayerIds
+    , setPlayerIds
+    , playerLives
     )
 where
 
@@ -26,6 +31,11 @@ import           Data.Function                  ( (&) )
 import           Data.List                      ( delete )
 import           SDL.Raw.Types                  ( JoystickID )
 import           Data.Bifunctor                 ( second )
+import           Graphics.Text.TrueType         ( Font )
+import           Graphics.Rasterific     hiding ( V2(..) )
+import qualified Graphics.Rasterific           as R
+                                                ( V2(..) )
+import           Graphics.Rasterific.Texture
 
 -- We keep track of bullets that intersect with a player so that they won't be
 -- hit twice by a single bullet from other player, or hit by their own bullet
@@ -43,12 +53,14 @@ pillarColor = PixelRGBA8 0x48 0x2D 0x3B 255
 pillarRadius = 86
 pillarImageId = "pillar"
 
+playerLives = 5
+
 createPillars :: Float -> Float -> [Pillar]
 createPillars boundsWidth boundsHeight =
     let distanceFromEdge = playerSide * 3 + pillarRadius
     in  [ Circle (V2 x y) pillarRadius
-        | x <- [distanceFromEdge, boundsWidth - distanceFromEdge]
-        , y <- [distanceFromEdge, boundsHeight - distanceFromEdge]
+        | y <- [distanceFromEdge, boundsHeight - distanceFromEdge]
+        , x <- [distanceFromEdge, boundsWidth - distanceFromEdge]
         ]
 
 matchSize :: Size2D
@@ -70,26 +82,56 @@ createMatch =
             (Movables
                 0
                 []
-                [ createPlayer' xDistanceFromEdge           0  Red
-                , createPlayer' (width - xDistanceFromEdge) pi Blue
+                [ createPlayer' xDistanceFromEdge           0  Blue
+                , createPlayer' (width - xDistanceFromEdge) pi Red
                 ]
             )
             (Obstacles bounds $ createPillars width height)
 
-staticMatchImages :: [(ImageId, VectorImage)]
-staticMatchImages =
+staticMatchImages :: Font -> [(ImageId, VectorImage)]
+staticMatchImages font =
     (pillarImageId, toSolidCircleImage pillarColor pillarRadius)
-        : staticPlayerImage
-        : staticBulletImages
+        :  staticPlayerImage
+        :  staticBulletImages
+        ++ staticScoreImages font
 
 drawMatch :: Match -> [(Rectangle Float, Either VectorImage ImageId)]
 drawMatch (Match (Movables _ bullets intersectedPlayers) (Obstacles _ pillars))
     = map drawBullet bullets
         ++ concatMap (drawPlayer . getPlayer) intersectedPlayers
         ++ map drawPillar pillars
+        ++ concat
+               (zipWith drawScore
+                        (map (\(Circle pos _) -> pos) pillars)
+                        (map getPlayer intersectedPlayers)
+               )
 
 drawPillar :: Pillar -> (Rectangle Float, Either VectorImage ImageId)
 drawPillar = (, Right pillarImageId) . toTextureArea
+
+scoreNumberSize = V2 35 45
+
+staticScoreImages :: Font -> [(ImageId, VectorImage)]
+staticScoreImages font =
+    [ ( show colorId ++ show number
+      , VectorImage scoreNumberSize transparent
+          $ withTexture (uniformTexture $ aimColor colorId)
+          $ printTextAt font (PointSize 45) (R.V2 (-5) 40)
+          $ show number
+      )
+    | colorId <- [Red, Blue]
+    , number  <- [0 .. 9]
+    ]
+
+drawScore
+    :: Position2D -> Player -> [(Rectangle Float, Either VectorImage ImageId)]
+drawScore midPos player =
+    let Player _ _ _ (Vitality deaths _) (PlayerId colorId _) = player
+    in  [ ( Rectangle (P $ midPos - scoreNumberSize / 2) scoreNumberSize
+              -- use modulo since only single digit numbers are supported
+          , Right $ show colorId ++ show ((playerLives - deaths) `mod` 10)
+          )
+        ]
 
 getPlayer :: IntersectedPlayer -> Player
 getPlayer (IntersectedPlayer _ player) = player
@@ -228,9 +270,9 @@ mapIntersecting f (IntersectedPlayer intersecting player) =
 
 assignJoysticksToMatch :: [JoystickID] -> Match -> Match
 assignJoysticksToMatch newJoysticks (Match movables obstacles) =
-    let Movables nextBulletId bullets players = movables
-        newPlayers = assignJoysticksToPlayers newJoysticks players
-    in  Match (Movables nextBulletId bullets newPlayers) obstacles
+    let Movables _ _ players = movables
+        newPlayers           = assignJoysticksToPlayers newJoysticks players
+    in  Match (setIntersectedPlayers newPlayers movables) obstacles
 
 assignJoysticksToPlayers
     :: [JoystickID] -> [IntersectedPlayer] -> [IntersectedPlayer]
@@ -239,3 +281,45 @@ assignJoysticksToPlayers []       ps       = ps
 assignJoysticksToPlayers (j : js) (p : ps) = if hasJoystick (getPlayer p)
     then p : assignJoysticksToPlayers (j : js) ps
     else mapPlayer (setJoystickId j) p : assignJoysticksToPlayers js ps
+
+getWinners :: Match -> [Color]
+getWinners (Match (Movables _ _ intersectedPlayers) _) =
+    let players = map getPlayer intersectedPlayers
+    in  if any ((>= playerLives) . getDeaths . getPlayer) intersectedPlayers
+            then map getColorId $ foldr mostAlive [] players
+            else []
+
+mostAlive :: Player -> [Player] -> [Player]
+mostAlive p [] = [p]
+mostAlive p others =
+    let otherDeaths = getDeaths $ head others
+        deaths      = getDeaths p
+    in  if otherDeaths < deaths
+            then others
+            else if otherDeaths > deaths then [p] else p : others
+
+setIntersectedPlayers :: [IntersectedPlayer] -> Movables -> Movables
+setIntersectedPlayers intersectedPlayers (Movables nextBulletId bullets _) =
+    Movables nextBulletId bullets intersectedPlayers
+
+getPlayerIds :: Match -> [PlayerId]
+getPlayerIds (Match (Movables _ _ intersectedPlayers) _) =
+    map (getPlayerId . getPlayer) intersectedPlayers
+
+setPlayerIds :: [PlayerId] -> Match -> Match
+setPlayerIds playerIds (Match movables obstacles) =
+    let Movables _ _ intersectedPlayers = movables
+    in  Match
+            (setIntersectedPlayers
+                (zipKeep (mapPlayer . setPlayerId) playerIds intersectedPlayers)
+                movables
+            )
+            obstacles
+
+-- Similar to zipWith but the length of the output is only determined by the
+-- last argument. If the first list is shorter, no function will be applied to
+-- the last elements.
+zipKeep :: (a -> b -> b) -> [a] -> [b] -> [b]
+zipKeep _ _        []       = []
+zipKeep _ []       ys       = ys
+zipKeep f (x : xs) (y : ys) = f x y : zipKeep f xs ys

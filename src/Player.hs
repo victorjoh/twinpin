@@ -1,10 +1,13 @@
 module Player
     ( PlayerId(..)
+    , Color(..)
     , Player(..)
     , Gun(..)
     , GunState(..)
     , Aim2D(..)
+    , Vitality(..)
     , playerMaxHealth
+    , Deaths
     , ReloadTime
     , playerSide
     , minFiringInterval
@@ -18,12 +21,16 @@ module Player
     , playerToCircle
     , setGun
     , triggerMinFireValue
-    , getPlayerId
     , hasJoystick
     , setJoystickId
     , squareSector
     , scaleAndOffset
     , inflictDamage
+    , aimColor
+    , getDeaths
+    , getColorId
+    , getPlayerId
+    , setPlayerId
     )
 where
 
@@ -56,9 +63,11 @@ data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
 type ReloadTime = DeltaTime
 data GunState = Firing | Idle deriving (Show, Eq)
 data Gun = Gun Aim2D ReloadTime GunState deriving (Show, Eq)
-data PlayerId = Red | Blue deriving (Show, Eq, Ord, Enum)
-data Player = Player Circle Velocity2D Gun Health PlayerId (Maybe JoystickID)
-              deriving (Show, Eq)
+data Color = Red | Blue deriving (Show, Eq)
+type Deaths = Int
+data Vitality = Vitality Deaths Health deriving (Show, Eq)
+data PlayerId = PlayerId Color (Maybe JoystickID) deriving (Show, Eq)
+data Player = Player Circle Velocity2D Gun Vitality PlayerId deriving (Show, Eq)
 
 playerMaxHealth :: Health
 playerMaxHealth = 1.0
@@ -81,23 +90,25 @@ rightBumberButtonId = 5
 rightTriggerButtonId = 5
 baseColor = PixelRGBA8 0xE6 0xE6 0xE6 255
 loadShadeColor = PixelRGBA8 0x16 0x0f 0x35 120
-healthShadeColor = PixelRGBA8 0x48 0x2D 0x3B 120 -- 0x16 0x0f 0x35 50
+healthShadeColor = PixelRGBA8 0x48 0x2D 0x3B 120
 baseImageId = "playerBase"
 
 playerSize :: Size2D
 playerSize = V2 playerSide playerSide
 
-createPlayer :: Position2D -> Angle2D -> PlayerId -> Maybe JoystickID -> Player
-createPlayer pos direction = Player (Circle pos (playerSide / 2))
-                                    (V2 0 0)
-                                    (Gun (Aim2D 0 0 direction) 0 Idle)
-                                    playerMaxHealth
+createPlayer :: Position2D -> Angle2D -> Color -> Maybe JoystickID -> Player
+createPlayer pos direction color joystickId = Player
+    (Circle pos (playerSide / 2))
+    (V2 0 0)
+    (Gun (Aim2D 0 0 direction) 0 Idle)
+    (Vitality 0 playerMaxHealth)
+    (PlayerId color joystickId)
 
 staticPlayerImage :: (ImageId, VectorImage)
 staticPlayerImage = (baseImageId, toSolidCircleImage baseColor playerRadius)
 
 drawPlayer :: Player -> [(Rectangle Float, Either VectorImage ImageId)]
-drawPlayer (Player shape _ gun health playerId _) =
+drawPlayer (Player shape _ gun (Vitality _ health) (PlayerId color _)) =
     let Circle _ radius = shape
         Gun (Aim2D _ _ direction) reloadTime _ = gun
         center          = R.V2 radius radius
@@ -122,7 +133,7 @@ drawPlayer (Player shape _ gun health playerId _) =
                             healthRadians
                         )
                         (toDrawing radius)
-                    withTexture (uniformTexture $ aimColor playerId) aimShape
+                    withTexture (uniformTexture $ aimColor color) aimShape
                     withTexture (uniformTexture loadShadeColor) $ withClipping
                         (fill $ rectangle
                             (R.V2 (radius * 2 / 3) (radius * 2 / 3))
@@ -163,9 +174,9 @@ reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
 reloadTimeToAimShadowLength maxShadowWidth reloadTime =
     maxShadowWidth * fromIntegral reloadTime / fromIntegral minFiringInterval
 
-aimColor :: PlayerId -> PixelRGBA8
-aimColor Red  = PixelRGBA8 0x5F 0x5F 0xD3 255
-aimColor Blue = PixelRGBA8 0xD3 0x5F 0x5F 255
+aimColor :: Color -> PixelRGBA8
+aimColor Red  = PixelRGBA8 0xD3 0x5F 0x5F 255
+aimColor Blue = PixelRGBA8 0x5F 0x5F 0xD3 255
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle
@@ -182,7 +193,8 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
 
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
 updatePlayer events dt obstacles player =
-    let Player shape velocity gun health playerId maybeJoystickId = player
+    let Player shape velocity gun vitality (PlayerId color maybeJoystickId)
+            = player
         Gun aim reloadTime state = gun
         axisEvents               = case maybeJoystickId of
             Just joystickId ->
@@ -197,9 +209,8 @@ updatePlayer events dt obstacles player =
     in  Player newCircle
                newVelocity
                (Gun newAim newReloadTime state)
-               health
-               playerId
-               (updateJoystick events =<< maybeJoystickId)
+               vitality
+               (PlayerId color $ updateJoystick events =<< maybeJoystickId)
 
 updateJoystick :: [Event] -> JoystickID -> Maybe JoystickID
 updateJoystick events joystickId = if hasJoystickRemovedEvent events joystickId
@@ -235,10 +246,10 @@ updateVelocity (V2 x y) (axisId, axisPos) =
 
 fireBullet :: [Event] -> BulletId -> Player -> (Player, Maybe Bullet)
 fireBullet events bulletId player =
-    let Player (Circle position _) _ gun _ _ maybeJoystickId = player
-        Gun aim reloadTime state = gun
-        Aim2D _ _ direction = aim
-        newState = getGunState state maybeJoystickId events
+    let Player (Circle position _) _ gun _ (PlayerId _ joystickId) = player
+        Gun   aim reloadTime state     = gun
+        Aim2D _   _          direction = aim
+        newState                       = getGunState state joystickId events
         (newReloadTime, maybeBullet) = if reloadTime == 0 && newState == Firing
             then
                 ( minFiringInterval
@@ -270,24 +281,38 @@ eventToGunState playerJoystickId (Event _ (JoyButtonEvent buttonEventData)) =
 eventToGunState _ _ = Nothing
 
 setGun :: Gun -> Player -> Player
-setGun gun (Player shape velocity _ health playerId joystickId) =
-    Player shape velocity gun health playerId joystickId
+setGun gun (Player shape velocity _ vitality playerId) =
+    Player shape velocity gun vitality playerId
 
 playerToCircle :: Player -> Circle
-playerToCircle (Player shape _ _ _ _ _) = shape
-
-getPlayerId :: Player -> PlayerId
-getPlayerId (Player _ _ _ _ playerId _) = playerId
+playerToCircle (Player shape _ _ _ _) = shape
 
 hasJoystick :: Player -> Bool
-hasJoystick (Player _ _ _ _ _ maybeJoystickId) = isJust maybeJoystickId
+hasJoystick (Player _ _ _ _ (PlayerId _ maybeJoystickId)) =
+    isJust maybeJoystickId
 
 setJoystickId :: JoystickID -> Player -> Player
-setJoystickId joystickId (Player shape velocity gun health playerId _) =
-    Player shape velocity gun health playerId $ Just joystickId
+setJoystickId joystickId (Player shape velocity gun vitality playerId) =
+    let PlayerId color _ = playerId
+    in  Player shape velocity gun vitality (PlayerId color $ Just joystickId)
 
 inflictDamage :: Health -> Player -> Player
-inflictDamage damage (Player shape velocity gun health playerId joystickId) =
-    Player shape velocity gun newHealth playerId joystickId
-  where
-    newHealth = if damage >= health then playerMaxHealth else health - damage
+inflictDamage damage (Player shape velocity gun vitality playerId) =
+    let Vitality deaths health = vitality
+        (newDeaths, newHealth) = if damage >= health
+            then (deaths + 1, playerMaxHealth)
+            else (deaths, health - damage)
+    in  Player shape velocity gun (Vitality newDeaths newHealth) playerId
+
+getDeaths :: Player -> Deaths
+getDeaths (Player _ _ _ (Vitality deaths _) _) = deaths
+
+getColorId :: Player -> Color
+getColorId player = let PlayerId color _ = getPlayerId player in color
+
+getPlayerId :: Player -> PlayerId
+getPlayerId (Player _ _ _ _ playerId) = playerId
+
+setPlayerId :: PlayerId -> Player -> Player
+setPlayerId playerId (Player shape velocity gun vitality _) =
+    Player shape velocity gun vitality playerId
