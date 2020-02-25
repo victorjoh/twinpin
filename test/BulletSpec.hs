@@ -17,12 +17,12 @@ spec = do
               (destination, _) = drawBullet bullet
           in  destination `shouldBe` toTextureArea (bulletToCircle bullet)
 
-    describe "updateBullet"
+    describe "moveBullet"
         $          it
                        ("updates the bullet position from passed time and the "
                        ++ "bullet velocity"
                        )
-        $          updateBullet 10 (createBullet (V2 6 2) (pi / 6) 0)
+        $          moveBullet 10 (createBullet (V2 6 2) (pi / 6) 0)
         `shouldBe` createBullet
                        (V2 (6 + 10 * bulletSpeed * sqrt 3 / 2)
                            (2 + 10 * bulletSpeed / 2)

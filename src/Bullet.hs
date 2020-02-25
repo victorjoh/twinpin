@@ -9,7 +9,7 @@ module Bullet
     , bulletRadius
     , createBullet
     , drawBullet
-    , updateBullet
+    , moveBullet
     , isBulletWithinBounds
     , bulletToCircle
     , setBulletHit
@@ -42,8 +42,8 @@ hasHitPlayerImageId = "hasHitPlayerBullet"
 
 createBullet :: Position2D -> Angle2D -> BulletId -> Bullet
 createBullet position direction = Bullet (Circle position bulletRadius)
-                                     (toVelocity direction bulletSpeed)
-                                     HasNotHitPlayer
+                                         (toVelocity direction bulletSpeed)
+                                         HasNotHitPlayer
 
 staticBulletImages :: [(ImageId, VectorImage)]
 staticBulletImages =
@@ -62,8 +62,8 @@ drawBullet (Bullet circle _ state _) =
         HasHitPlayer    -> Right hasHitPlayerImageId
     )
 
-updateBullet :: DeltaTime -> Bullet -> Bullet
-updateBullet dt (Bullet circle velocity state bulletId) =
+moveBullet :: DeltaTime -> Bullet -> Bullet
+moveBullet dt (Bullet circle velocity state bulletId) =
     Bullet (moveCircle velocity dt circle) velocity state bulletId
 
 isBulletWithinBounds :: Bounds2D -> Bullet -> Bool

@@ -105,7 +105,7 @@ spec = do
               in  updateGame [] 150 game
                       `shouldBe` Game
                                      150
-                                     (Running $ bulletToMatch $ updateBullet
+                                     (Running $ bulletToMatch $ moveBullet
                                          50
                                          bullet
                                      )
@@ -171,7 +171,7 @@ spec = do
                           (Match
                               (Movables
                                   1
-                                  [setBulletHit $ updateBullet td bullet]
+                                  [setBulletHit $ moveBullet td bullet]
                                   [ IntersectedPlayer [] red
                                   , IntersectedPlayer [0]
                                   $ setHealth playerMaxHealth
@@ -204,7 +204,7 @@ spec = do
                           (Match
                               (Movables
                                   1
-                                  [setBulletHit $ updateBullet td bullet]
+                                  [setBulletHit $ moveBullet td bullet]
                                   [ IntersectedPlayer [0]
                                   $ setHealth playerMaxHealth
                                   $ setDeaths playerLives red
@@ -239,8 +239,7 @@ spec = do
                           (Match
                               (Movables
                                   2
-                                  (map (setBulletHit . updateBullet td) [b1, b2]
-                                  )
+                                  (map (setBulletHit . moveBullet td) [b1, b2])
                                   ( zipWith
                                           (\bulletId ->
                                               IntersectedPlayer [bulletId]
@@ -383,7 +382,7 @@ spec = do
                       updateGame [] 1200 switchedToRunning
               in
                   getBullets runningMatch
-                      `shouldBe` [ updateBullet 200
+                      `shouldBe` [ moveBullet 200
                                        $ createBullet (V2 100 300) 0 0
                                  ]
         it

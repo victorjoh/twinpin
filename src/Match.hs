@@ -128,7 +128,7 @@ drawScore
 drawScore midPos player =
     let Player _ _ _ (Vitality deaths _) (PlayerId colorId _) = player
     in  [ ( Rectangle (P $ midPos - scoreNumberSize / 2) scoreNumberSize
-              -- use modulo since only single digit numbers are supported
+                  -- use modulo since only single digit numbers are supported
           , Right $ show colorId ++ show ((playerLives - deaths) `mod` 10)
           )
         ]
@@ -191,7 +191,7 @@ addToObstacles (Obstacles bounds pillars) intersectedPlayers =
 
 moveBullets :: DeltaTime -> Movables -> Movables
 moveBullets dt (Movables nextBulletId bullets intersectedPlayers) =
-    Movables nextBulletId (map (updateBullet dt) bullets) intersectedPlayers
+    Movables nextBulletId (map (moveBullet dt) bullets) intersectedPlayers
 
 fireBullets :: [Event] -> Movables -> Movables
 fireBullets events (Movables nextBulletId bullets intersectedPlayers) = foldr
