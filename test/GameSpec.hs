@@ -17,7 +17,8 @@ import           SDL                     hiding ( Paused )
 import           SDL.Internal.Types             ( Window(..) )
 import           Foreign.Ptr                    ( nullPtr )
 import           MatchUtil
-import           Test.HUnit.Approx
+import           Approx
+import           SpaceUtil                      ( )
 
 spec :: Spec
 spec = do
@@ -360,7 +361,7 @@ spec = do
                       updateGame [] 1200 switchedToRunning
                   newPosition = getPlayerPosition $ getFirstPlayer runningMatch
               in
-                  newPosition @?~ V2 150 300
+                  newPosition `shouldApproxBe` V2 150 300
         it
                 (  "keeps track of trigger changes while the game is paused "
                 ++ "so the players are given the correct initial firing state "

@@ -11,8 +11,9 @@ import           Bullet
 import           BulletUtil
 import           SDL
 import           MatchUtil
-import           Test.HUnit.Approx
 import           VisualUtil                     ( )
+import           SpaceUtil                      ( )
+import           Approx
 
 spec :: Spec
 spec = do
@@ -83,7 +84,8 @@ spec = do
                   moveEvent = createMoveRightEvent 0 50 (fromIntegral td)
                   new       = updateMatch [moveEvent] td old
               in
-                  getPlayerPosition (getFirstPlayer new) @?~ V2 98 350
+                  getPlayerPosition (getFirstPlayer new)
+                      `shouldApproxBe` V2 98 350
         it "can create a bullet"
             $ let
                   position  = V2 48 350

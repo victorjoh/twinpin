@@ -1,4 +1,5 @@
 {-# LANGUAGE ImplicitParams #-}
+
 module PlayerSpec where
 
 import           Test.Hspec
@@ -7,50 +8,15 @@ import           PlayerUtil
 import           Space
 import           Circle
 import           Bullet                         ( createBullet )
-import           SDL
+import           SDL                     hiding ( Epsilon )
 import           SDL.Input.Joystick             ( JoyButtonState(..) )
 import           Data.Maybe
 import           Data.List                      ( replicate )
+import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
-import           Test.HUnit.Base                ( Assertion )
-import           Control.Monad                  ( when )
-import           Test.HUnit.Lang                ( HUnitFailure(..)
-                                                , FailureReason(..)
-                                                )
-import           Control.Exception              ( throwIO )
-import           Data.CallStack
-
-location :: HasCallStack => Maybe SrcLoc
-location = case reverse callStack of
-    (_, loc) : _ -> Just loc
-    []           -> Nothing
-
-shouldApproxBe
-    :: ( HasCallStack
-       , Ord a
-       , Num (f a)
-       , Show (f a)
-       , Foldable f
-       , Functor f
-       , Eq (f a)
-       , Show a
-       , ?epsilon::a
-       )
-    => [f a]
-    -> [f a]
-    -> Assertion
-shouldApproxBe expected actual
-    | length expected /= length actual
-    = expected `shouldBe` actual
-    | otherwise
-    = when (any (or . fmap (> ?epsilon) . abs) $ zipWith (-) actual expected)
-        $ throwIO
-              (HUnitFailure location $ ExpectedButGot
-                  (Just $ "maximum margin of error: " ++ show ?epsilon)
-                  (show expected)
-                  (show actual)
-              )
+import           Approx
+import           VisualSpec                     ( )
 
 spec :: Spec
 spec = do
@@ -286,125 +252,6 @@ spec = do
               in
                   getGunState new `shouldBe` Idle
 
-    describe "squareSector" $ do
-        let ?epsilon = 0.00001
-        let tan30    = tan $ pi / 6
-        it "gives no points if angle is 0 deg" $ squareSector 0 `shouldBe` []
-        it "gives no points if angle is less than 0 deg"
-            $          squareSector (-pi / 4)
-            `shouldBe` []
-        it "gives a square sector for 30 deg"
-            $                squareSector (pi / 6)
-            `shouldApproxBe` [R.V2 1 (-tan30), R.V2 1 0, R.V2 0 0]
-        it "gives a square sector for 45 deg"
-            $                squareSector (pi / 4)
-            `shouldApproxBe` [R.V2 1 (-1), R.V2 1 0, R.V2 0 0]
-        it "gives a square sector for 60 deg"
-            $                squareSector (pi / 3)
-            `shouldApproxBe` [R.V2 tan30 (-1), R.V2 1 (-1), R.V2 1 0, R.V2 0 0]
-        it "gives a square sector for 90 deg"
-            $                squareSector (pi / 2)
-            `shouldApproxBe` [R.V2 0 (-1), R.V2 1 (-1), R.V2 1 0, R.V2 0 0]
-        it "gives a square sector for 120 deg"
-            $                squareSector (pi * 2 / 3)
-            `shouldApproxBe` [ R.V2 (-tan30) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 135 deg"
-            $                squareSector (pi * 3 / 4)
-            `shouldApproxBe` [R.V2 (-1) (-1), R.V2 1 (-1), R.V2 1 0, R.V2 0 0]
-        it "gives a square sector for 150 deg"
-            $                squareSector (pi * 5 / 6)
-            `shouldApproxBe` [ R.V2 (-1) (-tan30)
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 180 deg"
-            $                squareSector pi
-            `shouldApproxBe` [ R.V2 (-1) 0
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 210 deg"
-            $                squareSector (pi * 7 / 6)
-            `shouldApproxBe` [ R.V2 (-1) tan30
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 225 deg"
-            $                squareSector (pi * 5 / 4)
-            `shouldApproxBe` [ R.V2 (-1) 1
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 240 deg"
-            $                squareSector (pi * 4 / 3)
-            `shouldApproxBe` [ R.V2 (-tan30) 1
-                             , R.V2 (-1) 1
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 270 deg"
-            $                squareSector (pi * 3 / 2)
-            `shouldApproxBe` [ R.V2 0 1
-                             , R.V2 (-1) 1
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 300 deg"
-            $                squareSector (pi * 5 / 3)
-            `shouldApproxBe` [ R.V2 tan30 1
-                             , R.V2 (-1) 1
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 315 deg"
-            $                squareSector (pi * 7 / 4)
-            `shouldApproxBe` [ R.V2 1 1
-                             , R.V2 (-1) 1
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square sector for 330 deg"
-            $                squareSector (pi * 11 / 6)
-            `shouldApproxBe` [ R.V2 1 tan30
-                             , R.V2 1 1
-                             , R.V2 (-1) 1
-                             , R.V2 (-1) (-1)
-                             , R.V2 1 (-1)
-                             , R.V2 1 0
-                             , R.V2 0 0
-                             ]
-        it "gives a square for 360 deg"
-            $          squareSector (2 * pi)
-            `shouldBe` [R.V2 1 1, R.V2 (-1) 1, R.V2 (-1) (-1), R.V2 1 (-1)]
-        it "gives a square for angles above 360 deg"
-            $          squareSector (pi * 9 / 4)
-            `shouldBe` [R.V2 1 1, R.V2 (-1) 1, R.V2 (-1) (-1), R.V2 1 (-1)]
-
-    describe "scaleAndOffset"
-        $ it "scales and offsets the points with a value"
-        $ scaleAndOffset 2 [R.V2 1 (-1), R.V2 (-1) (-1), R.V2 (-1) 1, R.V2 1 1]
-        `shouldBe` [R.V2 4 0, R.V2 0 0, R.V2 0 4, R.V2 4 4]
-
     describe "inflictDamage" $ do
         it "reduces the health of the player"
             $ let old = createPlayer (V2 0 0) 0 Red Nothing
@@ -419,3 +266,64 @@ spec = do
             $ let old = setHealth 0.05 $ createPlayer (V2 0 0) 0 Red Nothing
               in  getDeaths (inflictDamage 0.15 old) `shouldBe` 1
 
+    describe "aimShadowShape" $ do
+        let ?epsilon = 0.01
+        it "is an empty shape if length is zero"
+            $          aimShadowShape 0
+            `shouldBe` []
+        it "should be a circle segment if less than 1/3"
+            $                aimShadowShape (1 / 6)
+            `shouldApproxBe` [ Left $ CubicBezier
+                                 (R.V2 (-1 / 6) (-1 / sqrt 12))
+                                 (R.V2 (-0.26695037) (-0.22991335))
+                                 (R.V2 (-1 / 3) (-0.12264779))
+                                 (R.V2 (-1 / 3) 0)
+                             , Left $ CubicBezier
+                                 (R.V2 (-1 / 3) 0)
+                                 (R.V2 (-1 / 3) 0.12264779)
+                                 (R.V2 (-0.26695037) 0.22991335)
+                                 (R.V2 (-1 / 6) (1 / sqrt 12))
+                             , Right $ Line (R.V2 (-1 / 6) (1 / sqrt 12))
+                                            (R.V2 (-1 / 6) (-1 / sqrt 12))
+                             ]
+        it
+                (  "should be half a circle and a rectangle if between 0 and "
+                ++ "~4/3"
+                )
+            $                aimShadowShape (5 / 6)
+            `shouldApproxBe` [ Left topLeftCurve
+                             , Left bottomLeftCurve
+                             , Right $ Line (R.V2 0 (1 / 3)) (R.V2 0.5 (1 / 3))
+                             , Right
+                                 $ Line (R.V2 0.5 (1 / 3)) (R.V2 0.5 (-1 / 3))
+                             , Right
+                                 $ Line (R.V2 0.5 (-1 / 3)) (R.V2 0 (-1 / 3))
+                             ]
+        it
+                (  "should be half a circle, a rectangle and another split "
+                ++ "circle segment when between ~4/3 and 4/3"
+                )
+            $                aimShadowShape (4 / 3 - 1e-2)
+            `shouldApproxBe` [ Left topLeftCurve
+                             , Left bottomLeftCurve
+                             , Right bottomLine
+                             , Left $ CubicBezier
+                                 (R.V2 0.9383697 0.34615636)
+                                 (R.V2 0.9717603 0.25577885)
+                                 (R.V2 0.99245834 0.15927286)
+                                 (R.V2 0.9982961 5.880624e-2)
+                             , Right $ Line (R.V2 0.9982961 5.880624e-2)
+                                            (R.V2 0.9982961 (-5.880624e-2))
+                             , Left $ CubicBezier
+                                 (R.V2 0.9982961 (-5.880624e-2))
+                                 (R.V2 0.99245834 (-0.15927286))
+                                 (R.V2 0.9717603 (-0.25577885))
+                                 (R.V2 0.9383697 (-0.34615636))
+                             , Right topLine
+                             ]
+        it
+                (  "should be half a circle, a rectangle and a circle segment "
+                ++ "when 4/3"
+                )
+            $          aimShadowShape (4 / 3)
+            `shouldBe` aimShape

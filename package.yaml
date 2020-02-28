@@ -88,8 +88,8 @@ tests:
     - twinpin
     - hspec
     - sdl2
-    - HUnit-approx
     - JuicyPixels
     - Rasterific
     - HUnit
     - call-stack
+    - relude
