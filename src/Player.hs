@@ -23,8 +23,6 @@ module Player
     , triggerMinFireValue
     , hasJoystick
     , setJoystickId
-    , squareSector
-    , scaleAndOffset
     , inflictDamage
     , aimColor
     , getDeaths
@@ -38,12 +36,19 @@ import           Space
 import           Bullet
 import           Circle
 import           Visual
-import           SDL
+import           SDL                     hiding ( (^+^)
+                                                , (^*)
+                                                , lerp
+                                                )
 import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
 import           Graphics.Rasterific.Texture
 import           Graphics.Rasterific.Transformations
+import           Graphics.Rasterific.Linear     ( (^+^)
+                                                , (^*)
+                                                , lerp
+                                                )
 import           Codec.Picture.Types
 import           Data.Word                      ( Word8 )
 import           Data.Int                       ( Int16 )
@@ -51,6 +56,10 @@ import           SDL.Raw.Types                  ( JoystickID )
 import           Data.Maybe
 import           Data.Tuple.Extra               ( (&&&) )
 import           Data.List                      ( foldl' )
+import           Data.Bifoldable                ( biList )
+import           Data.Bifunctor                 ( bimap
+                                                , first
+                                                )
 
 type AxisId = Word8
 type AxisPosition = Int16
@@ -100,7 +109,7 @@ createPlayer :: Position2D -> Angle2D -> Color -> Maybe JoystickID -> Player
 createPlayer pos direction color joystickId = Player
     (Circle pos (playerSide / 2))
     (V2 0 0)
-    (Gun (Aim2D 0 0 direction) 0 Idle)
+    (Gun (Aim2D 0 0 direction) 0 Firing)
     (Vitality 0 playerMaxHealth)
     (PlayerId color joystickId)
 
@@ -115,12 +124,7 @@ drawPlayer (Player shape _ gun (Vitality _ health) (PlayerId color _)) =
         textureArea     = toTextureArea shape
         diameter        = toDiameter radius
         healthRadians   = (1 - health) * (2 * pi)
-        aimShape =
-                withClipping
-                        ( stroke (playerSide / 3) JoinRound (CapRound, CapRound)
-                        $ line center (R.V2 playerSide radius)
-                        )
-                    $ toDrawing radius
+        aimShape'       = fill $ aimShape center radius
         shadowLength = reloadTimeToAimShadowLength (radius * 4 / 3) reloadTime
     in  [ (textureArea, Right baseImageId)
         , ( textureArea
@@ -128,47 +132,131 @@ drawPlayer (Player shape _ gun (Vitality _ health) (PlayerId color _)) =
               $ VectorImage (V2 diameter diameter) transparent
               $ withTransformation (rotateCenter direction center)
               $ do
-                    withTexture (uniformTexture healthShadeColor) $ withClipping
-                        (fill $ polygon $ scaleAndOffset radius $ squareSector
-                            healthRadians
-                        )
-                        (toDrawing radius)
-                    withTexture (uniformTexture $ aimColor color) aimShape
-                    withTexture (uniformTexture loadShadeColor) $ withClipping
-                        (fill $ rectangle
-                            (R.V2 (radius * 2 / 3) (radius * 2 / 3))
-                            shadowLength
-                            (playerSide / 3)
-                        )
-                        aimShape
+                    withTexture (uniformTexture healthShadeColor)
+                        $ fill
+                        $ circleSector center radius healthRadians
+                    withTexture (uniformTexture $ aimColor color) aimShape'
+                    withTexture (uniformTexture loadShadeColor)
+                        $ fill
+                        $ aimShadowShape center radius shadowLength
           )
         ]
 
-scaleAndOffset :: Size1D -> [R.V2 Float] -> [R.V2 Float]
-scaleAndOffset value = map $ fmap (+ value) . (^* value)
-
-squareSector :: Angle2D -> [R.V2 Float]
-squareSector a
-    | a <= 0
+cubicBezierAimShadow :: Float -> [Either CubicBezier Line]
+cubicBezierAimShadow len
+    | len <= 0
     = []
-    | a > 0 && a <= (pi / 4)
-    = R.V2 1 (-tan a) : squareSector0
-    | a > (pi / 4) && a <= (pi * 3 / 4)
-    = R.V2 (tan $ pi / 2 - a) (-1) : squareSector45
-    | a > (pi * 3 / 4) && a <= (pi * 5 / 4)
-    = R.V2 (-1) (tan a) : squareSector135
-    | a > (pi * 5 / 4) && a <= (pi * 7 / 4)
-    = R.V2 (tan $ a - pi / 2) 1 : squareSector225
-    | a > (pi * 7 / 4) && a < (2 * pi)
-    = R.V2 1 (-tan a) : squareSector315
+    | len > 0 && len < 1 / 3
+    = let
+          t       = len * 3
+          topLeft = snd $ cubicBezierBreakAt
+              (transform (^* (1 / 3)) circleQuadrant2)
+              (1 - t)
+          bottomRight = fst $ cubicBezierBreakAt
+              (transform (^* (1 / 3)) circleQuadrant3)
+              t
+      in
+          [ Left topLeft
+          , Left bottomRight
+          , Right $ Line (_cBezierX3 bottomRight) (_cBezierX0 topLeft)
+          ]
+    | len >= 1 / 3 && len <= getX (_cBezierX0 outerTop) + 1 / 3
+    = let t             = (len - 1 / 3) / getX (_cBezierX0 outerTop)
+          cutBottomLine = fst $ lineBreakAt bottomLine t
+          cutTopLine    = snd $ lineBreakAt topLine (1 - t)
+      in  map (first $ transform (^* (1 / 3)))
+              [Left circleQuadrant2, Left circleQuadrant3]
+              ++ [ Right cutBottomLine
+                 , Right $ Line (_lineX1 cutBottomLine) (_lineX0 cutTopLine)
+                 , Right cutTopLine
+                 ]
+    | len > getX (_cBezierX0 outerTop) + 1 / 3 && len < 4 / 3
+    = []
     | otherwise
-    = [R.V2 1 1, R.V2 (-1) 1, R.V2 (-1) (-1), R.V2 1 (-1)]
+    = cubicBezierAim
+    where getX (R.V2 x _) = x
+
+outerT = tan (1 / 3) * 2 / pi
+outerTop = fst $ cubicBezierBreakAt circleQuadrant1 outerT
+outerBottom = snd $ cubicBezierBreakAt circleQuadrant4 (1 - outerT)
+bottomLine = Line (R.V2 0 (1 / 3)) (_cBezierX0 outerBottom)
+topLine = Line (_cBezierX3 outerTop) (R.V2 0 (-1 / 3))
+
+cubicBezierAim :: [Either CubicBezier Line]
+cubicBezierAim =
+    map (first $ transform (^* (1 / 3)))
+        [Left circleQuadrant2, Left circleQuadrant3]
+        ++ [Right bottomLine, Left outerBottom, Left outerTop, Right topLine]
+
+circleQuadrant1, circleQuadrant2, circleQuadrant3, circleQuadrant4
+    :: CubicBezier
+circleQuadrant1 =
+    CubicBezier (R.V2 1 0) (R.V2 1 (-cc)) (R.V2 cc (-1)) (R.V2 0 (-1))
+circleQuadrant2 =
+    CubicBezier (R.V2 0 (-1)) (R.V2 (-cc) (-1)) (R.V2 (-1) (-cc)) (R.V2 (-1) 0)
+circleQuadrant3 =
+    CubicBezier (R.V2 (-1) 0) (R.V2 (-1) cc) (R.V2 (-cc) 1) (R.V2 0 1)
+circleQuadrant4 = CubicBezier (R.V2 0 1) (R.V2 cc 1) (R.V2 1 cc) (R.V2 1 0)
+cc = 0.551915024494
+
+-- copied from Graphics.Rasterific.CubicBezier since it is in an unexposed
+-- module
+-- https://github.com/Twinside/Rasterific/blob/d607a5916a840c173c4a6c60f52c7e1a1533544e/src/Graphics/Rasterific/CubicBezier.hs#L260
+cubicBezierBreakAt :: CubicBezier -> Float -> (CubicBezier, CubicBezier)
+cubicBezierBreakAt (CubicBezier a b c d) val =
+    (CubicBezier a ab abbc abbcbccd, CubicBezier abbcbccd bccd cd d)
   where
-    squareSector0   = [R.V2 1 0, R.V2 0 0]
-    squareSector45  = R.V2 1 (-1) : squareSector0
-    squareSector135 = R.V2 (-1) (-1) : squareSector45
-    squareSector225 = R.V2 (-1) 1 : squareSector135
-    squareSector315 = R.V2 1 1 : squareSector225
+    ab       = lerp val b a
+    bc       = lerp val c b
+    cd       = lerp val d c
+
+    abbc     = lerp val bc ab
+    bccd     = lerp val cd bc
+    abbcbccd = lerp val bccd abbc
+
+lineBreakAt :: Line -> Float -> (Line, Line)
+lineBreakAt (Line a b) t = (Line a ab, Line ab b) where ab = lerp t b a
+
+cubicBezierCircleSector :: Angle2D -> ([CubicBezier], [Line])
+cubicBezierCircleSector a
+    | a <= 0
+    = ([], [])
+    | a > 0 && a < 2 * pi
+    = let nbrOfQuadrants = ceiling $ a * 2 / pi
+          quadrants      = drop (4 - nbrOfQuadrants) bezierCircle
+          cutQuadrant    = fst $ cubicBezierBreakAt
+              (head quadrants)
+              ((a - fromIntegral (nbrOfQuadrants - 1) * pi / 2) * 2 / pi)
+          orig = R.V2 0 0
+      in  ( cutQuadrant : tail quadrants
+          , [Line orig (R.V2 1 0), Line (_cBezierX3 cutQuadrant) orig]
+          )
+    | otherwise
+    = (bezierCircle, [])
+  where
+    bezierCircle =
+        [circleQuadrant4, circleQuadrant3, circleQuadrant2, circleQuadrant1]
+
+aimShape :: R.V2 Float -> Radius -> [Primitive]
+aimShape center radius = map
+    (either (CubicBezierPrim . transform mv) (LinePrim . transform mv))
+    cubicBezierAim
+    where mv p = (p ^* radius) ^+^ center
+
+aimShadowShape :: R.V2 Float -> Radius -> Position1D -> [Primitive]
+aimShadowShape center radius len = map
+    (either (CubicBezierPrim . transform mv) (LinePrim . transform mv))
+    (cubicBezierAimShadow (len / radius))
+    where mv p = (p ^* radius) ^+^ center
+
+circleSector :: R.V2 Float -> Radius -> Angle2D -> [Primitive]
+circleSector center radius a =
+    concat
+        $ biList
+        $ bimap (fmap $ CubicBezierPrim . transform mv)
+                (fmap $ LinePrim . transform mv)
+        $ cubicBezierCircleSector a
+    where mv p = (p ^* radius) ^+^ center
 
 reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
 reloadTimeToAimShadowLength maxShadowWidth reloadTime =
