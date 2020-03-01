@@ -142,64 +142,46 @@ drawPlayer (Player shape _ gun (Vitality _ health) (PlayerId color _)) =
           )
         ]
 
-cubicBezierAimShadow :: Float -> [Either CubicBezier Line]
-cubicBezierAimShadow len
-    | len <= 0
-    = []
-    | len > 0 && len < 1 / 3
-    = let
-          t       = len * 3
-          topLeft = snd $ cubicBezierBreakAt
-              (transform (^* (1 / 3)) circleQuadrant2)
-              (1 - t)
-          bottomLeft = fst $ cubicBezierBreakAt
-              (transform (^* (1 / 3)) circleQuadrant3)
-              t
-      in
-          [ Left topLeft
-          , Left bottomLeft
-          , Right $ Line (_cBezierX3 bottomLeft) (_cBezierX0 topLeft)
-          ]
-    | len >= 1 / 3 && len <= getX (_cBezierX0 outerBottom) + 1 / 3
-    = let t             = (len - 1 / 3) / getX (_cBezierX0 outerBottom)
-          cutBottomLine = fst $ lineBreakAt bottomLine t
-          cutTopLine    = snd $ lineBreakAt topLine (1 - t)
-      in  map (first $ transform (^* (1 / 3)))
-              [Left circleQuadrant2, Left circleQuadrant3]
-              ++ [ Right cutBottomLine
-                 , Right $ Line (_lineX1 cutBottomLine) (_lineX0 cutTopLine)
-                 , Right cutTopLine
-                 ]
-    | len > getX (_cBezierX0 outerBottom) + 1 / 3 && len < 4 / 3
-    = let t =
-                  (len - getX (_cBezierX0 outerBottom) - 1 / 3)
-                      / (1 - getX (_cBezierX0 outerBottom))
-          bottomRight = fst $ cubicBezierBreakAt outerBottom t
-          topRight    = snd $ cubicBezierBreakAt outerTop (1 - t)
-      in  map (first $ transform (^* (1 / 3)))
-              [Left circleQuadrant2, Left circleQuadrant3]
-              ++ [ Right bottomLine
-                 , Left bottomRight
-                 , Right $ Line (_cBezierX3 bottomRight) (_cBezierX0 topRight)
-                 , Left topRight
-                 , Right topLine
-                 ]
-    | otherwise
-    = cubicBezierAim
-    where getX (R.V2 x _) = x
+aimColor :: Color -> PixelRGBA8
+aimColor Red  = PixelRGBA8 0xD3 0x5F 0x5F 255
+aimColor Blue = PixelRGBA8 0x5F 0x5F 0xD3 255
 
-outerT = tan (1 / 3) * 2 / pi
-outerTop = fst $ cubicBezierBreakAt circleQuadrant1 outerT
-outerBottom = snd $ cubicBezierBreakAt circleQuadrant4 (1 - outerT)
-bottomLine = Line (R.V2 0 (1 / 3)) (_cBezierX0 outerBottom)
-topLine = Line (_cBezierX3 outerTop) (R.V2 0 (-1 / 3))
+aimShape :: R.V2 Float -> Radius -> [Primitive]
+aimShape center radius = map
+    (either (CubicBezierPrim . transform mv) (LinePrim . transform mv))
+    cubicBezierAim
+    where mv p = (p ^* radius) ^+^ center
 
-cubicBezierAim :: [Either CubicBezier Line]
-cubicBezierAim =
-    map (first $ transform (^* (1 / 3)))
-        [Left circleQuadrant2, Left circleQuadrant3]
-        ++ [Right bottomLine, Left outerBottom, Left outerTop, Right topLine]
+aimShadowShape :: R.V2 Float -> Radius -> Position1D -> [Primitive]
+aimShadowShape center radius len = map
+    (either (CubicBezierPrim . transform mv) (LinePrim . transform mv))
+    (cubicBezierAimShadow (len / radius))
+    where mv p = (p ^* radius) ^+^ center
 
+reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
+reloadTimeToAimShadowLength maxShadowWidth reloadTime =
+    maxShadowWidth * fromIntegral reloadTime / fromIntegral minFiringInterval
+
+circleSector :: R.V2 Float -> Radius -> Angle2D -> [Primitive]
+circleSector center radius a =
+    concat
+        $ biList
+        $ bimap (fmap $ CubicBezierPrim . transform mv)
+                (fmap $ LinePrim . transform mv)
+        $ cubicBezierCircleSector a
+    where mv p = (p ^* radius) ^+^ center
+
+--         , - ~ ~ ~ - ,
+--     , '       |       ' ,
+--   ,           |           ,
+--  ,     2      |      1     ,
+-- ,             |             ,
+-- ,-------------+-------------,
+-- ,             |             ,
+--  ,     3      |      4     ,
+--   ,           |           ,
+--     ,         |        , '
+--       ' - , _ _ _ ,  '
 circleQuadrant1, circleQuadrant2, circleQuadrant3, circleQuadrant4
     :: CubicBezier
 circleQuadrant1 =
@@ -249,34 +231,81 @@ cubicBezierCircleSector a
     bezierCircle =
         [circleQuadrant4, circleQuadrant3, circleQuadrant2, circleQuadrant1]
 
-aimShape :: R.V2 Float -> Radius -> [Primitive]
-aimShape center radius = map
-    (either (CubicBezierPrim . transform mv) (LinePrim . transform mv))
-    cubicBezierAim
-    where mv p = (p ^* radius) ^+^ center
+--               , - ~ ~ ~ - ,
+--           , '               ' ,
+--         ,             topLine   ,
+--        ,          , ~ ~ ~ ~ ~ ~ ~,
+--    topLeftCurve '                 , topRightCurve
+--       ,        |  -  -  -  -  -  -,
+-- bottomLeftCurve ,                 , bottomRightCurve
+--        ,          ' ~ ~ ~ ~ ~ ~ ~,
+--         ,           bottomLine  ,
+--           ,                  , '
+--             ' - , _ _ _ ,  '
+outerT = tan (1 / 3) * 2 / pi
+topRightCurve = fst $ cubicBezierBreakAt circleQuadrant1 outerT
+bottomRightCurve = snd $ cubicBezierBreakAt circleQuadrant4 (1 - outerT)
+bottomLine = Line (R.V2 0 (1 / 3)) (_cBezierX0 bottomRightCurve)
+topLine = Line (_cBezierX3 topRightCurve) (R.V2 0 (-1 / 3))
 
-aimShadowShape :: R.V2 Float -> Radius -> Position1D -> [Primitive]
-aimShadowShape center radius len = map
-    (either (CubicBezierPrim . transform mv) (LinePrim . transform mv))
-    (cubicBezierAimShadow (len / radius))
-    where mv p = (p ^* radius) ^+^ center
+cubicBezierAim :: [Either CubicBezier Line]
+cubicBezierAim =
+    map (first $ transform (^* (1 / 3)))
+        [Left circleQuadrant2, Left circleQuadrant3]
+        ++ [ Right bottomLine
+           , Left bottomRightCurve
+           , Left topRightCurve
+           , Right topLine
+           ]
 
-circleSector :: R.V2 Float -> Radius -> Angle2D -> [Primitive]
-circleSector center radius a =
-    concat
-        $ biList
-        $ bimap (fmap $ CubicBezierPrim . transform mv)
-                (fmap $ LinePrim . transform mv)
-        $ cubicBezierCircleSector a
-    where mv p = (p ^* radius) ^+^ center
-
-reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
-reloadTimeToAimShadowLength maxShadowWidth reloadTime =
-    maxShadowWidth * fromIntegral reloadTime / fromIntegral minFiringInterval
-
-aimColor :: Color -> PixelRGBA8
-aimColor Red  = PixelRGBA8 0xD3 0x5F 0x5F 255
-aimColor Blue = PixelRGBA8 0x5F 0x5F 0xD3 255
+cubicBezierAimShadow :: Float -> [Either CubicBezier Line]
+cubicBezierAimShadow len
+    | len <= 0
+    = []
+    | len > 0 && len < 1 / 3
+    = let
+          t       = len * 3
+          topLeft = snd $ cubicBezierBreakAt
+              (transform (^* (1 / 3)) circleQuadrant2)
+              (1 - t)
+          bottomLeft = fst $ cubicBezierBreakAt
+              (transform (^* (1 / 3)) circleQuadrant3)
+              t
+      in
+          [ Left topLeft
+          , Left bottomLeft
+          , Right $ Line (_cBezierX3 bottomLeft) (_cBezierX0 topLeft)
+          ]
+    | len >= 1 / 3 && len <= getX (_cBezierX0 bottomRightCurve) + 1 / 3
+    = let t             = (len - 1 / 3) / getX (_cBezierX0 bottomRightCurve)
+          cutBottomLine = fst $ lineBreakAt bottomLine t
+          cutTopLine    = snd $ lineBreakAt topLine (1 - t)
+      in  map (first $ transform (^* (1 / 3)))
+              [Left circleQuadrant2, Left circleQuadrant3]
+              ++ [ Right cutBottomLine
+                 , Right $ Line (_lineX1 cutBottomLine) (_lineX0 cutTopLine)
+                 , Right cutTopLine
+                 ]
+    | len > getX (_cBezierX0 bottomRightCurve) + 1 / 3 && len < 4 / 3
+    = let
+          t =
+              (len - getX (_cBezierX0 bottomRightCurve) - 1 / 3)
+                  / (1 - getX (_cBezierX0 bottomRightCurve))
+          cutBottomRightCurve = fst $ cubicBezierBreakAt bottomRightCurve t
+          cutTopRightCurve    = snd $ cubicBezierBreakAt topRightCurve (1 - t)
+      in
+          map (first $ transform (^* (1 / 3)))
+              [Left circleQuadrant2, Left circleQuadrant3]
+              ++ [ Right bottomLine
+                 , Left cutBottomRightCurve
+                 , Right $ Line (_cBezierX3 cutBottomRightCurve)
+                                (_cBezierX0 cutTopRightCurve)
+                 , Left cutTopRightCurve
+                 , Right topLine
+                 ]
+    | otherwise
+    = cubicBezierAim
+    where getX (R.V2 x _) = x
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle
