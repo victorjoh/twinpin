@@ -152,16 +152,16 @@ cubicBezierAimShadow len
           topLeft = snd $ cubicBezierBreakAt
               (transform (^* (1 / 3)) circleQuadrant2)
               (1 - t)
-          bottomRight = fst $ cubicBezierBreakAt
+          bottomLeft = fst $ cubicBezierBreakAt
               (transform (^* (1 / 3)) circleQuadrant3)
               t
       in
           [ Left topLeft
-          , Left bottomRight
-          , Right $ Line (_cBezierX3 bottomRight) (_cBezierX0 topLeft)
+          , Left bottomLeft
+          , Right $ Line (_cBezierX3 bottomLeft) (_cBezierX0 topLeft)
           ]
-    | len >= 1 / 3 && len <= getX (_cBezierX0 outerTop) + 1 / 3
-    = let t             = (len - 1 / 3) / getX (_cBezierX0 outerTop)
+    | len >= 1 / 3 && len <= getX (_cBezierX0 outerBottom) + 1 / 3
+    = let t             = (len - 1 / 3) / getX (_cBezierX0 outerBottom)
           cutBottomLine = fst $ lineBreakAt bottomLine t
           cutTopLine    = snd $ lineBreakAt topLine (1 - t)
       in  map (first $ transform (^* (1 / 3)))
@@ -170,8 +170,20 @@ cubicBezierAimShadow len
                  , Right $ Line (_lineX1 cutBottomLine) (_lineX0 cutTopLine)
                  , Right cutTopLine
                  ]
-    | len > getX (_cBezierX0 outerTop) + 1 / 3 && len < 4 / 3
-    = []
+    | len > getX (_cBezierX0 outerBottom) + 1 / 3 && len < 4 / 3
+    = let t =
+                  (len - getX (_cBezierX0 outerBottom) - 1 / 3)
+                      / (1 - getX (_cBezierX0 outerBottom))
+          bottomRight = fst $ cubicBezierBreakAt outerBottom t
+          topRight    = snd $ cubicBezierBreakAt outerTop (1 - t)
+      in  map (first $ transform (^* (1 / 3)))
+              [Left circleQuadrant2, Left circleQuadrant3]
+              ++ [ Right bottomLine
+                 , Left bottomRight
+                 , Right $ Line (_cBezierX3 bottomRight) (_cBezierX0 topRight)
+                 , Left topRight
+                 , Right topLine
+                 ]
     | otherwise
     = cubicBezierAim
     where getX (R.V2 x _) = x
