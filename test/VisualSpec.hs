@@ -1,3 +1,4 @@
+{-# LANGUAGE ImplicitParams #-}
 module VisualSpec where
 
 import           Test.Hspec
@@ -6,6 +7,10 @@ import           Visual
 import           SDL.Vect
 import           Circle
 import           Codec.Picture.Types
+import           Test.HUnit.Approx
+import           Graphics.Rasterific     hiding ( V2(..) )
+import qualified Graphics.Rasterific           as R
+                                                ( V2(..) )
 
 spec :: Spec
 spec = do
@@ -57,3 +62,120 @@ spec = do
         $          it "scales a rectangle with a given multiplier"
         $          scaleRectangle 2 (Rectangle (P $ V2 5 7) (V2 11 13))
         `shouldBe` Rectangle (P $ V2 10 14) (V2 22 26)
+
+
+    describe "circleSector" $ do
+        let xLine = Right $ Line (R.V2 0 0) (R.V2 1 0)
+        it "gives no points if angle is 0 deg" $ circleSector 0 `shouldBe` []
+        it "gives no points if angle is less than 0 deg"
+            $          circleSector (-pi / 4)
+            `shouldBe` []
+        it "gives a circle sector for 45 deg"
+            $          circleSector (pi / 4)
+            `shouldBe` [ xLine
+                       , Right
+                           $ Line (R.V2 0.7069682 (-0.7069682)) (R.V2 0.0 0.0)
+                       , Left $ CubicBezier (R.V2 1.0 0.0)
+                                            (R.V2 1.0 (-0.27595752))
+                                            (R.V2 0.8879788 (-0.5259575))
+                                            (R.V2 0.7069682 (-0.7069682))
+                       ]
+        it "gives a circle sector for 135 deg"
+            $          circleSector (pi * 3 / 4)
+            `shouldBe` [ xLine
+                       , Right $ Line (R.V2 (-0.70696807) (-0.70696807))
+                                      (R.V2 0.0 0.0)
+                       , Left $ CubicBezier
+                           (R.V2 0.0 (-1.0))
+                           (R.V2 (-0.2759575) (-1.0))
+                           (R.V2 (-0.52595747) (-0.8879787))
+                           (R.V2 (-0.70696807) (-0.70696807))
+                       , Left circleQuadrant1
+                       ]
+        it "gives a circle sector for 180 deg"
+            $          circleSector pi
+            `shouldBe` [ xLine
+                       , Right $ Line (R.V2 (-1.0) 0.0) (R.V2 0.0 0.0)
+                       , Left circleQuadrant2
+                       , Left circleQuadrant1
+                       ]
+        it "gives a circle sector for 225 deg"
+            $          circleSector (pi * 5 / 4)
+            `shouldBe` [ xLine
+                       , Right
+                           $ Line (R.V2 (-0.70696807) 0.7069682) (R.V2 0.0 0.0)
+                       , Left $ CubicBezier (R.V2 (-1.0) 0.0)
+                                            (R.V2 (-1.0) 0.27595755)
+                                            (R.V2 (-0.88797873) 0.5259576)
+                                            (R.V2 (-0.70696807) 0.7069682)
+                       , Left circleQuadrant2
+                       , Left circleQuadrant1
+                       ]
+        it "gives a circle sector for 315 deg"
+            $          circleSector (pi * 7 / 4)
+            `shouldBe` [ xLine
+                       , Right $ Line (R.V2 0.7069683 0.70696795) (R.V2 0.0 0.0)
+                       , Left $ CubicBezier (R.V2 0.0 1.0)
+                                            (R.V2 0.2759576 1.0)
+                                            (R.V2 0.5259577 0.8879787)
+                                            (R.V2 0.7069683 0.70696795)
+                       , Left circleQuadrant3
+                       , Left circleQuadrant2
+                       , Left circleQuadrant1
+                       ]
+        it "gives a circle for 360 deg"
+            $          circleSector (2 * pi)
+            `shouldBe` map Left bezierCircle
+        it "gives a circle for angles above 360 deg"
+            $          circleSector (pi * 9 / 4)
+            `shouldBe` map Left bezierCircle
+
+    describe "scaleAndOffset"
+        $          it "scales and offsets the points with a value"
+        $          scaleAndOffset 2 (Line (R.V2 1 (-1)) (R.V2 (-1) (-1)))
+        `shouldBe` Line (R.V2 4 0) (R.V2 0 0)
+
+    describe "breakCubicBezierAt" $ do
+        let ?epsilon = 0.00001
+        let bezierValue t (CubicBezier p0 p1 p2 p3) =
+                ((1 - t) ^ 3 *^ p0)
+                    + (3 * (1 - t) ^ 2 * t *^ p1)
+                    + (3 * (1 - t) * t ^ 2 *^ p2)
+                    + (t ^ 3 *^ p3)
+        it
+                (  "splits a bezier curve in two, keeping the curvature of the "
+                ++ "orignal curve when seen together"
+                )
+            $ let
+                  original = CubicBezier (R.V2 0 1)
+                                         (R.V2 2 15)
+                                         (R.V2 13 (-1))
+                                         (R.V2 10 8)
+                  (left, right)              = breakCubicBezierAt original 0.6
+                  R.V2 leftMidX   leftMidY   = bezierValue 0.5 left
+                  R.V2 rightMidX  rightMidY  = bezierValue 0.5 right
+                  R.V2 original3X original3Y = bezierValue 0.3 original
+                  R.V2 original8X original8Y = bezierValue 0.8 original
+              in
+                  do
+                      leftMidX @?~ original3X
+                      leftMidY @?~ original3Y
+                      rightMidX @?~ original8X
+                      rightMidY @?~ original8Y
+
+    describe "breakLineAt" $ do
+        let ?epsilon = 0.00001
+        it "splits a line in two"
+            $ let (left, right) =
+                      breakLineAt (Line (R.V2 1 0) (R.V2 11 20)) 0.6
+                  Line (R.V2 newX0  newY0 ) (R.V2 newX10 newY10) = left
+                  Line (R.V2 newX11 newY11) (R.V2 newX2  newY2 ) = right
+              in  do
+                      newX0 @?~ 1
+                      newY0 @?~ 0
+                      newX10 @?~ 7
+                      newY10 @?~ 12
+                      newX11 @?~ 7
+                      newY11 @?~ 12
+                      newX2 @?~ 11
+                      newY2 @?~ 20

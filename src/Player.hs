@@ -29,15 +29,7 @@ module Player
     , getColorId
     , getPlayerId
     , setPlayerId
-    , circleSector
-    , scaleAndOffset
-    , breakCubicBezierAt
-    , breakLineAt
-    , bezierCircle
-    , circleQuadrant1
-    , circleQuadrant2
-    , circleQuadrant3
-    , circleQuadrant4
+    , aimShadowShape
     )
 where
 
@@ -54,10 +46,7 @@ import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
 import           Graphics.Rasterific.Texture
 import           Graphics.Rasterific.Transformations
-import           Graphics.Rasterific.Linear     ( (^+^)
-                                                , (^*)
-                                                , lerp
-                                                )
+import           Graphics.Rasterific.Linear     ( (^*) )
 import           Codec.Picture.Types
 import           Data.Word                      ( Word8 )
 import           Data.Int                       ( Int16 )
@@ -148,9 +137,6 @@ fillShape color shape = withTexture (uniformTexture color) $ fill $ map
     )
     shape
 
-scaleAndOffset :: Transformable a => Size1D -> a -> a
-scaleAndOffset s = transform ((^+^ R.V2 s s) . (^* s))
-
 aimColor :: Color -> PixelRGBA8
 aimColor Red  = PixelRGBA8 0xD3 0x5F 0x5F 255
 aimColor Blue = PixelRGBA8 0x5F 0x5F 0xD3 255
@@ -158,76 +144,6 @@ aimColor Blue = PixelRGBA8 0x5F 0x5F 0xD3 255
 reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
 reloadTimeToAimShadowLength maxShadowWidth reloadTime =
     maxShadowWidth * fromIntegral reloadTime / fromIntegral minFiringInterval
-
---         , - ~ ~ ~ - ,
---     , '       |       ' ,
---   ,           |           ,
---  ,     2      |      1     ,
--- ,             |             ,
--- ,-------------+-------------,
--- ,             |             ,
---  ,     3      |      4     ,
---   ,           |           ,
---     ,         |        , '
---       ' - , _ _ _ ,  '
-circleQuadrant1, circleQuadrant2, circleQuadrant3, circleQuadrant4
-    :: CubicBezier
-circleQuadrant1 = CubicBezier (R.V2 1 0)
-                              (R.V2 1 (-bezierCircleConstant))
-                              (R.V2 bezierCircleConstant (-1))
-                              (R.V2 0 (-1))
-circleQuadrant2 = CubicBezier (R.V2 0 (-1))
-                              (R.V2 (-bezierCircleConstant) (-1))
-                              (R.V2 (-1) (-bezierCircleConstant))
-                              (R.V2 (-1) 0)
-circleQuadrant3 = CubicBezier (R.V2 (-1) 0)
-                              (R.V2 (-1) bezierCircleConstant)
-                              (R.V2 (-bezierCircleConstant) 1)
-                              (R.V2 0 1)
-circleQuadrant4 = CubicBezier (R.V2 0 1)
-                              (R.V2 bezierCircleConstant 1)
-                              (R.V2 1 bezierCircleConstant)
-                              (R.V2 1 0)
-bezierCircleConstant = 0.551915024494
-
-bezierCircle :: [CubicBezier]
-bezierCircle =
-    [circleQuadrant4, circleQuadrant3, circleQuadrant2, circleQuadrant1]
-
--- copied from Graphics.Rasterific.CubicBezier since it is in an unexposed
--- module
--- https://github.com/Twinside/Rasterific/blob/d607a5916a840c173c4a6c60f52c7e1a1533544e/src/Graphics/Rasterific/CubicBezier.hs#L260
-breakCubicBezierAt :: CubicBezier -> Float -> (CubicBezier, CubicBezier)
-breakCubicBezierAt (CubicBezier a b c d) val =
-    (CubicBezier a ab abbc abbcbccd, CubicBezier abbcbccd bccd cd d)
-  where
-    ab       = lerp val b a
-    bc       = lerp val c b
-    cd       = lerp val d c
-
-    abbc     = lerp val bc ab
-    bccd     = lerp val cd bc
-    abbcbccd = lerp val bccd abbc
-
-breakLineAt :: Line -> Float -> (Line, Line)
-breakLineAt (Line a b) t = (Line a ab, Line ab b) where ab = lerp t b a
-
-circleSector :: Angle2D -> [Either CubicBezier Line]
-circleSector a
-    | a <= 0
-    = []
-    | a > 0 && a < 2 * pi
-    = let nbrOfQuadrants = ceiling $ a * 2 / pi
-          quadrants      = drop (4 - nbrOfQuadrants) bezierCircle
-          cutQuadrant    = fst $ breakCubicBezierAt
-              (head quadrants)
-              ((a - fromIntegral (nbrOfQuadrants - 1) * pi / 2) * 2 / pi)
-          orig = R.V2 0 0
-      in  Right (Line orig (R.V2 1 0))
-              : Right (Line (_cBezierX3 cutQuadrant) orig)
-              : map Left (cutQuadrant : tail quadrants)
-    | otherwise
-    = map Left bezierCircle
 
 --               , - ~ ~ ~ - ,
 --           , '               ' ,

@@ -1,4 +1,3 @@
-{-# LANGUAGE ImplicitParams #-}
 module PlayerSpec where
 
 import           Test.Hspec
@@ -11,47 +10,6 @@ import           SDL
 import           SDL.Input.Joystick             ( JoyButtonState(..) )
 import           Data.Maybe
 import           Data.List                      ( replicate )
-import           Graphics.Rasterific     hiding ( V2(..) )
-import qualified Graphics.Rasterific           as R
-                                                ( V2(..) )
-import           Test.HUnit.Base                ( Assertion )
-import           Control.Monad                  ( when )
-import           Test.HUnit.Lang                ( HUnitFailure(..)
-                                                , FailureReason(..)
-                                                )
-import           Control.Exception              ( throwIO )
-import           Data.CallStack
-
-location :: HasCallStack => Maybe SrcLoc
-location = case reverse callStack of
-    (_, loc) : _ -> Just loc
-    []           -> Nothing
-
-shouldApproxBe
-    :: ( HasCallStack
-       , Ord a
-       , Num (f a)
-       , Show (f a)
-       , Foldable f
-       , Functor f
-       , Eq (f a)
-       , Show a
-       , ?epsilon::a
-       )
-    => [f a]
-    -> [f a]
-    -> Assertion
-shouldApproxBe expected actual
-    | length expected /= length actual
-    = expected `shouldBe` actual
-    | otherwise
-    = when (any (or . fmap (> ?epsilon) . abs) $ zipWith (-) actual expected)
-        $ throwIO
-              (HUnitFailure location $ ExpectedButGot
-                  (Just $ "maximum margin of error: " ++ show ?epsilon)
-                  (show expected)
-                  (show actual)
-              )
 
 spec :: Spec
 spec = do
@@ -287,83 +245,6 @@ spec = do
               in
                   getGunState new `shouldBe` Idle
 
-    describe "circleSector" $ do
-        let xLine = Right $ Line (R.V2 0 0) (R.V2 1 0)
-        it "gives no points if angle is 0 deg" $ circleSector 0 `shouldBe` []
-        it "gives no points if angle is less than 0 deg"
-            $          circleSector (-pi / 4)
-            `shouldBe` []
-        it "gives a circle sector for 45 deg"
-            $          circleSector (pi / 4)
-            `shouldBe` [ xLine
-                       , Right
-                           $ Line (R.V2 0.7069682 (-0.7069682)) (R.V2 0.0 0.0)
-                       , Left $ CubicBezier (R.V2 1.0 0.0)
-                                            (R.V2 1.0 (-0.27595752))
-                                            (R.V2 0.8879788 (-0.5259575))
-                                            (R.V2 0.7069682 (-0.7069682))
-                       ]
-        it "gives a circle sector for 135 deg"
-            $          circleSector (pi * 3 / 4)
-            `shouldBe` [ xLine
-                       , Right $ Line (R.V2 (-0.70696807) (-0.70696807))
-                                      (R.V2 0.0 0.0)
-                       , Left $ CubicBezier
-                           (R.V2 0.0 (-1.0))
-                           (R.V2 (-0.2759575) (-1.0))
-                           (R.V2 (-0.52595747) (-0.8879787))
-                           (R.V2 (-0.70696807) (-0.70696807))
-                       , Left circleQuadrant1
-                       ]
-        it "gives a circle sector for 180 deg"
-            $          circleSector pi
-            `shouldBe` [ xLine
-                       , Right $ Line (R.V2 (-1.0) 0.0) (R.V2 0.0 0.0)
-                       , Left circleQuadrant2
-                       , Left circleQuadrant1
-                       ]
-        it "gives a circle sector for 225 deg"
-            $          circleSector (pi * 5 / 4)
-            `shouldBe` [ xLine
-                       , Right
-                           $ Line (R.V2 (-0.70696807) 0.7069682) (R.V2 0.0 0.0)
-                       , Left $ CubicBezier (R.V2 (-1.0) 0.0)
-                                            (R.V2 (-1.0) 0.27595755)
-                                            (R.V2 (-0.88797873) 0.5259576)
-                                            (R.V2 (-0.70696807) 0.7069682)
-                       , Left circleQuadrant2
-                       , Left circleQuadrant1
-                       ]
-        it "gives a circle sector for 315 deg"
-            $          circleSector (pi * 7 / 4)
-            `shouldBe` [ xLine
-                       , Right $ Line (R.V2 0.7069683 0.70696795) (R.V2 0.0 0.0)
-                       , Left $ CubicBezier (R.V2 0.0 1.0)
-                                            (R.V2 0.2759576 1.0)
-                                            (R.V2 0.5259577 0.8879787)
-                                            (R.V2 0.7069683 0.70696795)
-                       , Left circleQuadrant3
-                       , Left circleQuadrant2
-                       , Left circleQuadrant1
-                       ]
-        it "gives a circle for 360 deg"
-            $          circleSector (2 * pi)
-            `shouldBe` map Left bezierCircle
-        it "gives a circle for angles above 360 deg"
-            $          circleSector (pi * 9 / 4)
-            `shouldBe` map Left bezierCircle
-
-    describe "scaleAndOffset"
-        $          it "scales and offsets the points with a value"
-        $          scaleAndOffset 2 (Line (R.V2 1 (-1)) (R.V2 (-1) (-1)))
-        `shouldBe` Line (R.V2 4 0) (R.V2 0 0)
-
-    describe "breakCubicBezierAt" $ it "does something" pending
-
-    describe "breakLineAt" $ it "does something" pending
-
-    describe "aimShadowShape" $ it "does something" pending
-
     describe "inflictDamage" $ do
         it "reduces the health of the player"
             $ let old = createPlayer (V2 0 0) 0 Red Nothing
@@ -377,3 +258,8 @@ spec = do
                 )
             $ let old = setHealth 0.05 $ createPlayer (V2 0 0) 0 Red Nothing
               in  getDeaths (inflictDamage 0.15 old) `shouldBe` 1
+
+    describe "aimShadowShape"
+        $          it "is an empty shape if length is zero"
+        $          aimShadowShape 0
+        `shouldBe` []

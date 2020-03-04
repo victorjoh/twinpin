@@ -91,5 +91,3 @@ tests:
     - HUnit-approx
     - JuicyPixels
     - Rasterific
-    - HUnit
-    - call-stack
