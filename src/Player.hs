@@ -30,6 +30,13 @@ module Player
     , getPlayerId
     , setPlayerId
     , aimShadowShape
+    , topLeftCurve
+    , bottomLeftCurve
+    , bottomLine
+    , bottomRightCurve
+    , topRightCurve
+    , topLine
+    , aimShape
     )
 where
 
@@ -180,7 +187,7 @@ aimShadowShape len
     = []
     | len > 0 && len < 1 / 3
     = let
-          t                  = len * 3
+          t                  = 2 / pi * acos (3 * len)
           cutTopLeftCurve    = snd $ breakCubicBezierAt topLeftCurve (1 - t)
           cutBottomLeftCurve = fst $ breakCubicBezierAt bottomLeftCurve t
       in
