@@ -7,7 +7,6 @@ import           Visual
 import           SDL.Vect
 import           Circle
 import           Codec.Picture.Types
-import           Test.HUnit.Approx
 import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )

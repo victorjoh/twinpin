@@ -5,7 +5,7 @@ module SpaceSpec where
 import           Test.Hspec
 import           Space
 import           SDL.Vect
-import           Test.HUnit.Approx
+import           Approx
 
 spec :: Spec
 spec = do
@@ -124,22 +124,20 @@ spec = do
     describe "angleDifference2D" $ do
         let ?epsilon = epsilon
         it "finds the difference between two angles"
-            $   angleDifference2D 3 2
-            @?~ 1
+            $                angleDifference2D 3 2
+            `shouldApproxBe` 1
         it "can handle negative and positive pi"
-            $   angleDifference2D pi (-pi)
-            @?~ 0
+            $                angleDifference2D pi (-pi)
+            `shouldApproxBe` 0
         it "can handle from positive to negative numbers"
-            $   angleDifference2D (pi * 3 / 4) (-pi * 3 / 4)
-            @?~ -pi
-            /   2
+            $                angleDifference2D (pi * 3 / 4) (-pi * 3 / 4)
+            `shouldApproxBe` (-pi / 2)
         it "can handle from negative to positive numbers"
-            $   angleDifference2D (-pi * 3 / 4) (pi * 3 / 4)
-            @?~ pi
-            /   2
+            $                angleDifference2D (-pi * 3 / 4) (pi * 3 / 4)
+            `shouldApproxBe` (pi / 2)
         it "can handle opposite angles"
-            $   abs (angleDifference2D (pi / 2) (-pi / 2))
-            @?~ pi
+            $                abs (angleDifference2D (pi / 2) (-pi / 2))
+            `shouldApproxBe` pi
 
     describe "offsetLine2D" $ do
         it "does not make any change if the offset is 0"
@@ -169,7 +167,7 @@ spec = do
             $          offsetDistanceToOrigin2D (-2) (-1, 0, 5)
             `shouldBe` (-1, 0, 3)
         it
-                ("when moving towards the origin with an offset bigger than "
+                (  "when moving towards the origin with an offset bigger than "
                 ++ "the distance the line will cross the origin"
                 )
             $          offsetDistanceToOrigin2D (-7) (-1, 0, 5)
