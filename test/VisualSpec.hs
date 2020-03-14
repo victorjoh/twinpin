@@ -10,6 +10,9 @@ import           Codec.Picture.Types
 import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
+import           Relude.Extra.Bifunctor         ( bimapBoth )
+import           Approx
+import           VisualUtil                     ( )
 
 spec :: Spec
 spec = do
@@ -150,31 +153,15 @@ spec = do
                                          (R.V2 2 15)
                                          (R.V2 13 (-1))
                                          (R.V2 10 8)
-                  (left, right)              = breakCubicBezierAt original 0.6
-                  R.V2 leftMidX   leftMidY   = bezierValue 0.5 left
-                  R.V2 rightMidX  rightMidY  = bezierValue 0.5 right
-                  R.V2 original3X original3Y = bezierValue 0.3 original
-                  R.V2 original8X original8Y = bezierValue 0.8 original
-              in
-                  do
-                      leftMidX @?~ original3X
-                      leftMidY @?~ original3Y
-                      rightMidX @?~ original8X
-                      rightMidY @?~ original8Y
+              in  bimapBoth (bezierValue 0.5) (breakCubicBezierAt original 0.6)
+                      `shouldApproxBe` ( bezierValue 0.3 original
+                                       , bezierValue 0.8 original
+                                       )
 
     describe "breakLineAt" $ do
         let ?epsilon = 0.00001
         it "splits a line in two"
-            $ let (left, right) =
-                      breakLineAt (Line (R.V2 1 0) (R.V2 11 20)) 0.6
-                  Line (R.V2 newX0  newY0 ) (R.V2 newX10 newY10) = left
-                  Line (R.V2 newX11 newY11) (R.V2 newX2  newY2 ) = right
-              in  do
-                      newX0 @?~ 1
-                      newY0 @?~ 0
-                      newX10 @?~ 7
-                      newY10 @?~ 12
-                      newX11 @?~ 7
-                      newY11 @?~ 12
-                      newX2 @?~ 11
-                      newY2 @?~ 20
+            $                breakLineAt (Line (R.V2 1 0) (R.V2 11 20)) 0.6
+            `shouldApproxBe` ( Line (R.V2 1 0)  (R.V2 7 12)
+                             , Line (R.V2 7 12) (R.V2 11 20)
+                             )

@@ -15,17 +15,8 @@ import           Data.List                      ( replicate )
 import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
-import           Data.Foldable                  ( toList )
 import           Approx
-
-instance Approx CubicBezier where
-    isApproxEqual = isApproxEqual' (\(CubicBezier a b c d) -> [a, b, c, d])
-
-instance Approx a => Approx (R.V2 a) where
-    isApproxEqual = isApproxEqual' toList
-
-instance Approx Line where
-    isApproxEqual = isApproxEqual' (\(Line a b) -> [a, b])
+import           VisualSpec                     ( )
 
 spec :: Spec
 spec = do

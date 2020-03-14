@@ -92,3 +92,4 @@ tests:
     - Rasterific
     - HUnit
     - call-stack
+    - relude

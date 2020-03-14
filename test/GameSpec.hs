@@ -18,6 +18,7 @@ import           SDL.Internal.Types             ( Window(..) )
 import           Foreign.Ptr                    ( nullPtr )
 import           MatchUtil
 import           Approx
+import           SpaceUtil                      ( )
 
 spec :: Spec
 spec = do

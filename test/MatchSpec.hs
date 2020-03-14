@@ -12,6 +12,7 @@ import           BulletUtil
 import           SDL
 import           MatchUtil
 import           VisualUtil                     ( )
+import           SpaceUtil                      ( )
 import           Approx
 
 spec :: Spec

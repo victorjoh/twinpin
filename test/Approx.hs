@@ -26,6 +26,10 @@ instance (Approx a, Approx b) => Approx (Either a b) where
         (Left  l1, Left l2 ) -> isApproxEqual e l1 l2
         (Right r1, Right r2) -> isApproxEqual e r1 r2
 
+instance (Approx a, Approx b) => Approx (a, b) where
+    isApproxEqual e (v1Left, v1Right) (v2Left, v2Right) =
+        isApproxEqual e v1Left v2Left && isApproxEqual e v1Right v2Right
+
 instance Approx Float where
     isApproxEqual e v1 v2 = e >= abs (v1 - v2)
 

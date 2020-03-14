@@ -1,6 +1,8 @@
 module SpaceUtil where
 
-import           Space
 import           Approx
+import           SDL                            ( V2 )
+import           Data.Foldable                  ( toList )
 
-instance 
+instance Approx a => Approx (V2 a) where
+    isApproxEqual = isApproxEqual' toList
