@@ -9,9 +9,7 @@ import           Space
 import           Circle
 import           Bullet                         ( createBullet )
 import           SDL                     hiding ( Epsilon )
-import           SDL.Input.Joystick             ( JoyButtonState(..) )
 import           Data.Maybe
-import           Data.List                      ( replicate )
 import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
