@@ -21,7 +21,6 @@ import           Data.Maybe                     ( fromJust
 import           Control.Monad                  ( unless
                                                 , (<=<)
                                                 )
-import           Codec.Picture                  ( PixelRGBA8(..) )
 import           Data.Vector.Generic            ( thaw )
 import           Graphics.Text.TrueType         ( loadFontFile )
 import           System.FilePath                ( (</>) )
