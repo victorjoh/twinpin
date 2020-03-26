@@ -40,8 +40,28 @@ setReloadTime reloadTime player =
     in  setGun (Gun aim reloadTime state) player
 
 setPlayerVelocity :: Velocity2D -> Player -> Player
-setPlayerVelocity velocity (Player circle _ gun vitality playerId) =
-    Player circle velocity gun vitality playerId
+setPlayerVelocity velocity (Player circle movement gun vitality playerId) =
+    Player circle (setMovementVelocity velocity movement) gun vitality playerId
+
+setPlayerBoostTime :: BoostTime -> Player -> Player
+setPlayerBoostTime boostTime (Player circle movement gun vitality playerId) =
+    Player circle newMovement gun vitality playerId
+    where newMovement = setMovementBoostTime boostTime movement
+
+setMovement :: Movement -> Player -> Player
+setMovement movement (Player circle _ gun vitality playerId) =
+    Player circle movement gun vitality playerId
+
+setMovementVelocity :: Velocity2D -> Movement -> Movement
+setMovementVelocity velocity (Movement _ _ boostTime) =
+    Movement velocity velocity boostTime
+
+setMovementBoostTime :: BoostTime -> Movement -> Movement
+setMovementBoostTime boostTime (Movement velocity direction _) =
+    Movement velocity direction boostTime
+
+getBoostTime :: Player -> BoostTime
+getBoostTime (Player _ (Movement _ _ boostTime) _ _ _) = boostTime
 
 getRequiredStickPosition :: Vector1D -> Time -> Integer
 getRequiredStickPosition distance time =
@@ -70,13 +90,17 @@ instance EventContent JoyDeviceEventData where
     toEventPayload = JoyDeviceEvent
 
 createMoveRightEvent :: JoystickID -> Vector1D -> Word32 -> Event
-createMoveRightEvent playerId distance time =
-    let
-        stickPos = getRequiredStickPosition distance $ fromIntegral time
+createMoveRightEvent = createMoveEvent 0
+
+createMoveDownEvent :: JoystickID -> Vector1D -> Word32 -> Event
+createMoveDownEvent = createMoveEvent 1
+
+createMoveEvent :: Word8 -> JoystickID -> Vector1D -> Word32 -> Event
+createMoveEvent direction playerId distance time =
+    let stickPos = getRequiredStickPosition distance $ fromIntegral time
         minPos   = minBound :: Int16
         maxPos   = maxBound :: Int16
-    in
-        if stickPos < toInteger minPos || stickPos > toInteger maxPos
+    in  if stickPos < toInteger minPos || stickPos > toInteger maxPos
             then error
                 (  "The required stick position "
                 ++ show stickPos
@@ -88,15 +112,12 @@ createMoveRightEvent playerId distance time =
                 ++ " JoyAxisEventData to accept it. Try using more time for the"
                 ++ " movement."
                 )
-            else Event
-                0
-                (JoyAxisEvent
-                    (JoyAxisEventData playerId 0 (fromInteger stickPos))
-                )
+            else toEvent
+                $ JoyAxisEventData playerId direction (fromInteger stickPos)
 
 createTriggerEvent :: JoystickID -> JoyButtonState -> Event
 createTriggerEvent joystickId state =
-    Event 0 (JoyButtonEvent (JoyButtonEventData joystickId 5 state))
+    toEvent $ JoyButtonEventData joystickId 5 state
 
 type ButtonID = Word8
 
