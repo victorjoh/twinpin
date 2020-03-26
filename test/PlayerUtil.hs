@@ -40,8 +40,12 @@ setReloadTime reloadTime player =
     in  setGun (Gun aim reloadTime state) player
 
 setPlayerVelocity :: Velocity2D -> Player -> Player
-setPlayerVelocity velocity (Player circle _ gun vitality playerId) =
-    Player circle velocity gun vitality playerId
+setPlayerVelocity velocity (Player circle movement gun vitality playerId) =
+    Player circle (setMovementVelocity velocity movement) gun vitality playerId
+
+setMovementVelocity :: Velocity2D -> Movement -> Movement
+setMovementVelocity velocity (Movement _ boostTime) =
+    Movement velocity boostTime
 
 getRequiredStickPosition :: Vector1D -> Time -> Integer
 getRequiredStickPosition distance time =

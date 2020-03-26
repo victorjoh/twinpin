@@ -6,6 +6,7 @@ module Player
     , GunState(..)
     , Aim2D(..)
     , Vitality(..)
+    , Movement(..)
     , playerMaxHealth
     , Deaths
     , ReloadTime
@@ -73,11 +74,17 @@ data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
 type ReloadTime = DeltaTime
 data GunState = Firing | Idle deriving (Show, Eq)
 data Gun = Gun Aim2D ReloadTime GunState deriving (Show, Eq)
-data Color = Red | Blue deriving (Show, Eq)
+
 type Deaths = Int
 data Vitality = Vitality Deaths Health deriving (Show, Eq)
+
+data Color = Red | Blue deriving (Show, Eq)
 data PlayerId = PlayerId Color (Maybe JoystickID) deriving (Show, Eq)
-data Player = Player Circle Velocity2D Gun Vitality PlayerId deriving (Show, Eq)
+
+type BoostTime = DeltaTime
+data Movement = Movement Velocity2D BoostTime deriving (Show, Eq)
+
+data Player = Player Circle Movement Gun Vitality PlayerId deriving (Show, Eq)
 
 playerMaxHealth :: Health
 playerMaxHealth = 1.0
@@ -109,7 +116,7 @@ playerSize = V2 playerSide playerSide
 createPlayer :: Position2D -> Angle2D -> Color -> Maybe JoystickID -> Player
 createPlayer pos direction color joystickId = Player
     (Circle pos (playerSide / 2))
-    (V2 0 0)
+    (Movement (V2 0 0) maxBound)
     (Gun (Aim2D 0 0 direction) 0 Idle)
     (Vitality 0 playerMaxHealth)
     (PlayerId color joystickId)
@@ -163,7 +170,7 @@ reloadTimeToAimShadowLength maxShadowWidth reloadTime =
 --         ,           bottomLine  ,
 --           ,                  , '
 --             ' - , _ _ _ ,  '
-rightCurveT = tan (1 / 3) * 2 / pi
+rightCurveT = tan (1 / 3) * 2 /  pi
 topRightCurve = fst $ breakCubicBezierAt circleQuadrant1 rightCurveT
 bottomRightCurve = snd $ breakCubicBezierAt circleQuadrant4 (1 - rightCurveT)
 bottomLine = Line (R.V2 0 (1 / 3)) (_cBezierX0 bottomRightCurve)
@@ -242,10 +249,11 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
 
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
 updatePlayer events dt obstacles player =
-    let Player shape velocity gun vitality (PlayerId color maybeJoystickId)
+    let Player shape movement gun vitality (PlayerId color maybeJoystickId)
             = player
-        Gun aim reloadTime state = gun
-        axisEvents               = case maybeJoystickId of
+        Movement velocity lastBoost = movement
+        Gun aim reloadTime state    = gun
+        axisEvents                  = case maybeJoystickId of
             Just joystickId ->
                 map (joyAxisEventAxis &&& joyAxisEventValue)
                     $ filter ((joystickId ==) . joyAxisEventWhich)
@@ -256,7 +264,7 @@ updatePlayer events dt obstacles player =
         newCircle     = moveCollidingCircle newVelocity dt obstacles shape
         newReloadTime = max 0 $ reloadTime - dt
     in  Player newCircle
-               newVelocity
+               (Movement newVelocity lastBoost)
                (Gun newAim newReloadTime state)
                vitality
                (PlayerId color $ updateJoystick events =<< maybeJoystickId)
