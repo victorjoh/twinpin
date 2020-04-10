@@ -21,7 +21,6 @@ import           Space
 import           Circle
 import           Visual
 import           SDL
-import           Codec.Picture.Types
 
 type BulletId = Int
 data Bullet = Bullet Circle Velocity2D BulletState BulletId deriving (Show, Eq)
@@ -49,8 +48,8 @@ staticBulletImages :: [(ImageId, VectorImage)]
 staticBulletImages =
     [ (imageId, toSolidCircleImage color bulletRadius)
     | (imageId, color) <-
-        [ (hasNotHitPlayerImageId, PixelRGBA8 0xff 0xe6 0x80 255)
-        , (hasHitPlayerImageId   , PixelRGBA8 0xd3 0x5f 0x5f 255)
+        [ (hasNotHitPlayerImageId, yellow)
+        , (hasHitPlayerImageId   , red)
         ]
     ]
 

@@ -3,6 +3,10 @@ module Visual
     , VectorImage(..)
     , ScaleRatio
     , transparent
+    , red
+    , blue
+    , yellow
+    , white
     , backgroundColorAlpha
     , backgroundColorRasterific
     , backgroundColorSDL
@@ -48,8 +52,12 @@ instance Show VectorImage where
     show (VectorImage size color _) =
         "VectorImage (" ++ show size ++ ") (" ++ show color ++ ") _"
 
-transparent :: PixelRGBA8
+transparent, red, blue, yellow, white :: PixelRGBA8
 transparent = PixelRGBA8 255 255 255 0
+red = PixelRGBA8 0xD3 0x5F 0x5F 255
+blue = PixelRGBA8 0x5F 0x5F 0xD3 255
+yellow = PixelRGBA8 0xFF 0xE6 0x80 255
+white = PixelRGBA8 0xE6 0xE6 0xE6 255
 
 createBackgroundColor :: (Word8 -> Word8 -> Word8 -> Word8 -> a) -> Word8 -> a
 createBackgroundColor typeConstructor = typeConstructor 34 11 21

@@ -152,8 +152,8 @@ spec = do
                                      )
         it "opens the win screen for red when red wins"
             $ let
-                  red = createPlayer (V2 200 200) 0 Red Nothing
-                  blue =
+                  redPlayer = createPlayer (V2 200 200) 0 Red Nothing
+                  bluePlayer =
                       setHealth (bulletDamage / 2)
                           $ setDeaths (playerLives - 1)
                           $ createPlayer (V2 500 500) 0 Blue Nothing
@@ -161,7 +161,7 @@ spec = do
                   td     = getBulletMovementTime 100
                   match  = Match
                       ( Movables 1 [bullet]
-                      $ map (IntersectedPlayer []) [red, blue]
+                      $ map (IntersectedPlayer []) [redPlayer, bluePlayer]
                       )
                       (Obstacles (createBounds 1920 1080) [])
                   game = Game 0 $ Running match
@@ -173,10 +173,10 @@ spec = do
                               (Movables
                                   1
                                   [setBulletHit $ moveBullet td bullet]
-                                  [ IntersectedPlayer [] red
+                                  [ IntersectedPlayer [] redPlayer
                                   , IntersectedPlayer [0]
                                   $ setHealth playerMaxHealth
-                                  $ setDeaths playerLives blue
+                                  $ setDeaths playerLives bluePlayer
                                   ]
                               )
                               (Obstacles (createBounds 1920 1080) [])
@@ -186,20 +186,22 @@ spec = do
                           []
                       )
         it "opens the win screen for blue when blue wins"
-            $ let red =
+            $ let
+                  redPlayer =
                       setHealth (bulletDamage / 2)
                           $ setDeaths (playerLives - 1)
                           $ createPlayer (V2 500 500) 0 Red Nothing
-                  blue   = createPlayer (V2 200 200) 0 Blue Nothing
-                  bullet = createBullet (V2 400 500) 0 0
-                  td     = getBulletMovementTime 100
-                  match  = Match
+                  bluePlayer = createPlayer (V2 200 200) 0 Blue Nothing
+                  bullet     = createBullet (V2 400 500) 0 0
+                  td         = getBulletMovementTime 100
+                  match      = Match
                       ( Movables 1 [bullet]
-                      $ map (IntersectedPlayer []) [red, blue]
+                      $ map (IntersectedPlayer []) [redPlayer, bluePlayer]
                       )
                       (Obstacles (createBounds 1920 1080) [])
                   game = Game 0 $ Running match
-              in  updateGame [] td game `shouldBe` Game
+              in
+                  updateGame [] td game `shouldBe` Game
                       td
                       (Interrupted
                           (Match
@@ -208,8 +210,8 @@ spec = do
                                   [setBulletHit $ moveBullet td bullet]
                                   [ IntersectedPlayer [0]
                                   $ setHealth playerMaxHealth
-                                  $ setDeaths playerLives red
-                                  , IntersectedPlayer [] blue
+                                  $ setDeaths playerLives redPlayer
+                                  , IntersectedPlayer [] bluePlayer
                                   ]
                               )
                               (Obstacles (createBounds 1920 1080) [])
@@ -219,22 +221,24 @@ spec = do
                           []
                       )
         it "opens the tie screen when it is a draw"
-            $ let red   = createPlayer (V2 200 200) 0 Red Nothing
-                  b1    = createBullet (V2 100 200) 0 0
-                  blue  = createPlayer (V2 500 500) 0 Blue Nothing
-                  b2    = createBullet (V2 400 500) 0 1
-                  td    = getBulletMovementTime 100
-                  match = Match
+            $ let
+                  redPlayer  = createPlayer (V2 200 200) 0 Red Nothing
+                  b1         = createBullet (V2 100 200) 0 0
+                  bluePlayer = createPlayer (V2 500 500) 0 Blue Nothing
+                  b2         = createBullet (V2 400 500) 0 1
+                  td         = getBulletMovementTime 100
+                  match      = Match
                       (Movables 2 [b1, b2] $ map
                           ( IntersectedPlayer []
                           . setHealth (bulletDamage / 2)
                           . setDeaths (playerLives - 1)
                           )
-                          [red, blue]
+                          [redPlayer, bluePlayer]
                       )
                       (Obstacles (createBounds 1920 1080) [])
                   game = Game 0 $ Running match
-              in  updateGame [] td game `shouldBe` Game
+              in
+                  updateGame [] td game `shouldBe` Game
                       td
                       (Interrupted
                           (Match
@@ -246,7 +250,9 @@ spec = do
                                               IntersectedPlayer [bulletId]
                                           )
                                           [0, 1]
-                                  $ map (setDeaths playerLives) [red, blue]
+                                  $ map
+                                        (setDeaths playerLives)
+                                        [redPlayer, bluePlayer]
                                   )
                               )
                               (Obstacles (createBounds 1920 1080) [])

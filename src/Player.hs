@@ -30,12 +30,12 @@ module Player
     , getPlayerId
     , setPlayerId
     , aimShadowShape
-    , topLeftCurve
-    , bottomLeftCurve
-    , bottomLine
-    , bottomRightCurve
-    , topRightCurve
-    , topLine
+    , aimTopLeftCurve
+    , aimBottomLeftCurve
+    , aimBottomLine
+    , aimBottomRightCurve
+    , aimTopRightCurve
+    , aimTopLine
     , aimShape
     )
 where
@@ -98,9 +98,10 @@ triggerMinFireValue = 0
 minAxisPosition = 5000
 rightBumberButtonId = 5
 rightTriggerButtonId = 5
-baseColor = PixelRGBA8 0xE6 0xE6 0xE6 255
+baseColor = white
 loadShadeColor = PixelRGBA8 0x16 0x0f 0x35 120
 healthShadeColor = PixelRGBA8 0x48 0x2D 0x3B 120
+boostColor = yellow
 baseImageId = "playerBase"
 
 playerSize :: Size2D
@@ -132,6 +133,7 @@ drawPlayer (Player outline _ gun (Vitality _ health) (PlayerId colorId _)) =
               $ withTransformation (rotateCenter direction center)
               $ do
                     fillShape healthShadeColor $ circleSector healthRadians
+                    fillShape (aimColor colorId) boostShape
                     fillShape (aimColor colorId) aimShape
                     fillShape loadShadeColor $ aimShadowShape shadowLength
           )
@@ -145,40 +147,72 @@ fillShape color shape = withTexture (uniformTexture color) $ fill $ map
     shape
 
 aimColor :: Color -> PixelRGBA8
-aimColor Red  = PixelRGBA8 0xD3 0x5F 0x5F 255
-aimColor Blue = PixelRGBA8 0x5F 0x5F 0xD3 255
+aimColor Red  = red
+aimColor Blue = blue
 
 reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
 reloadTimeToAimShadowLength maxShadowWidth reloadTime =
     maxShadowWidth * fromIntegral reloadTime / fromIntegral minFiringInterval
 
---               , - ~ ~ ~ - ,
---           , '               ' ,
---         ,             topLine   ,
---        ,          , ~ ~ ~ ~ ~ ~ ~,
---    topLeftCurve '                 , topRightCurve
---       ,        |  -  -  -  -  -  -,
--- bottomLeftCurve ,                 , bottomRightCurve
---        ,          ' ~ ~ ~ ~ ~ ~ ~,
---         ,           bottomLine  ,
---           ,                  , '
---             ' - , _ _ _ ,  '
-rightCurveT = tan (1 / 3) * 2 / pi
-topRightCurve = fst $ breakCubicBezierAt circleQuadrant1 rightCurveT
-bottomRightCurve = snd $ breakCubicBezierAt circleQuadrant4 (1 - rightCurveT)
-bottomLine = Line (R.V2 0 (1 / 3)) (_cBezierX0 bottomRightCurve)
-topLine = Line (_cBezierX3 topRightCurve) (R.V2 0 (-1 / 3))
-topLeftCurve = transform (^* (1 / 3)) circleQuadrant2
-bottomLeftCurve = transform (^* (1 / 3)) circleQuadrant3
+--                             , - ~ ~ ~ - ,
+--                         , '               ' ,
+--                       ,  ', boostTopLine      ,
+--    boostTopLeftCurve ,     ',                  ,
+--                     ,      ' boostTopRightCurve ,
+--                     , - - '                     ,
+--                     ,     ' boostBottomRightCurve
+-- boostBottomLeftCurve ,     ',                  ,
+--                       ,   .'                  ,
+--                         ,' boostBottomLine , '
+--                           ' - , _ _ _ ,  '
+
+boostTopLeftCurve = snd $ breakCubicBezierAt circleQuadrant2 0.5
+boostBottomLeftCurve = fst $ breakCubicBezierAt circleQuadrant3 0.5
+boostTopRightCurve = transform (^* (2 / 3)) boostTopLeftCurve
+boostBottomRightCurve = transform (^* (2 / 3)) boostBottomLeftCurve
+boostTopLine =
+    Line (_cBezierX0 boostTopLeftCurve) (_cBezierX0 boostTopRightCurve)
+boostBottomLine =
+    Line (_cBezierX3 boostBottomLeftCurve) (_cBezierX3 boostBottomRightCurve)
+
+boostShape :: [Either CubicBezier Line]
+boostShape =
+    [ Left boostTopLeftCurve
+    , Left boostBottomLeftCurve
+    , Right boostBottomLine
+    , Left boostBottomRightCurve
+    , Left boostTopRightCurve
+    , Right boostTopLine
+    ]
+
+--                  , - ~ ~ ~ - ,
+--              , '               ' ,
+--            ,            aimTopLine ,
+--           ,          , ~ ~ ~ ~ ~ ~ ~,
+--    aimTopLeftCurve '                 , aimTopRightCurve
+--          ,        |  -  -  -  -  -  -,
+-- aimBottomLeftCurve ,                 , aimBottomRightCurve
+--           ,          ' ~ ~ ~ ~ ~ ~ ~,
+--            ,          aimBottomLine,
+--              ,                  , '
+--                ' - , _ _ _ ,  '
+aimRightCurveT = tan (1 / 3) * 2 / pi
+aimTopRightCurve = fst $ breakCubicBezierAt circleQuadrant1 aimRightCurveT
+aimBottomRightCurve =
+    snd $ breakCubicBezierAt circleQuadrant4 (1 - aimRightCurveT)
+aimBottomLine = Line (R.V2 0 (1 / 3)) (_cBezierX0 aimBottomRightCurve)
+aimTopLine = Line (_cBezierX3 aimTopRightCurve) (R.V2 0 (-1 / 3))
+aimTopLeftCurve = transform (^* (1 / 3)) circleQuadrant2
+aimBottomLeftCurve = transform (^* (1 / 3)) circleQuadrant3
 
 aimShape :: [Either CubicBezier Line]
 aimShape =
-    [ Left topLeftCurve
-    , Left bottomLeftCurve
-    , Right bottomLine
-    , Left bottomRightCurve
-    , Left topRightCurve
-    , Right topLine
+    [ Left aimTopLeftCurve
+    , Left aimBottomLeftCurve
+    , Right aimBottomLine
+    , Left aimBottomRightCurve
+    , Left aimTopRightCurve
+    , Right aimTopLine
     ]
 
 aimShadowShape :: Float -> [Either CubicBezier Line]
@@ -188,8 +222,8 @@ aimShadowShape len
     | len > 0 && len < 1 / 3
     = let
           t                  = 2 / pi * acos (3 * len)
-          cutTopLeftCurve    = snd $ breakCubicBezierAt topLeftCurve (1 - t)
-          cutBottomLeftCurve = fst $ breakCubicBezierAt bottomLeftCurve t
+          cutTopLeftCurve    = snd $ breakCubicBezierAt aimTopLeftCurve (1 - t)
+          cutBottomLeftCurve = fst $ breakCubicBezierAt aimBottomLeftCurve t
       in
           [ Left cutTopLeftCurve
           , Left cutBottomLeftCurve
@@ -198,34 +232,34 @@ aimShadowShape len
           ]
     | len >= 1 / 3 && len <= lineLength + 1 / 3
     = let t             = (len - 1 / 3) / lineLength
-          cutBottomLine = fst $ breakLineAt bottomLine t
-          cutTopLine    = snd $ breakLineAt topLine (1 - t)
-      in  [ Left topLeftCurve
-          , Left bottomLeftCurve
+          cutBottomLine = fst $ breakLineAt aimBottomLine t
+          cutTopLine    = snd $ breakLineAt aimTopLine (1 - t)
+      in  [ Left aimTopLeftCurve
+          , Left aimBottomLeftCurve
           , Right cutBottomLine
           , Right $ Line (_lineX1 cutBottomLine) (_lineX0 cutTopLine)
           , Right cutTopLine
           ]
     | len > lineLength + 1 / 3 && len < 4 / 3
     = let
-          t                   = (len - lineLength - 1 / 3) / (1 - lineLength)
-          cutBottomRightCurve = fst $ breakCubicBezierAt bottomRightCurve t
-          cutTopRightCurve    = snd $ breakCubicBezierAt topRightCurve (1 - t)
+          t = (len - lineLength - 1 / 3) / (1 - lineLength)
+          cutBottomRightCurve = fst $ breakCubicBezierAt aimBottomRightCurve t
+          cutTopRightCurve = snd $ breakCubicBezierAt aimTopRightCurve (1 - t)
       in
-          [ Left topLeftCurve
-          , Left bottomLeftCurve
-          , Right bottomLine
+          [ Left aimTopLeftCurve
+          , Left aimBottomLeftCurve
+          , Right aimBottomLine
           , Left cutBottomRightCurve
           , Right $ Line (_cBezierX3 cutBottomRightCurve)
                          (_cBezierX0 cutTopRightCurve)
           , Left cutTopRightCurve
-          , Right topLine
+          , Right aimTopLine
           ]
     | otherwise
     = aimShape
   where
     getX (R.V2 x _) = x
-    lineLength = getX $ _cBezierX0 bottomRightCurve
+    lineLength = getX $ _cBezierX0 aimBottomRightCurve
 
 createAngle :: Direction1D -> Direction1D -> Angle2D -> Angle2D
 createAngle 0 0 oldAngle = oldAngle

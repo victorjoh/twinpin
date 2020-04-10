@@ -20,7 +20,7 @@ data Menu = Menu Header ContinueName Selection deriving (Show, Eq)
 menuSize :: Size2D
 menuSize = V2 540 414
 
-defaultTextColor = PixelRGBA8 0xE6 0xE6 0xE6 255
+defaultTextColor = white
 
 getMenuImageId :: Header -> ImageId
 getMenuImageId header = "menu-" ++ concatMap fst header

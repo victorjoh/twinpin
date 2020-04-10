@@ -289,8 +289,8 @@ spec = do
                 ++ "~4/3"
                 )
             $                aimShadowShape (5 / 6)
-            `shouldApproxBe` [ Left topLeftCurve
-                             , Left bottomLeftCurve
+            `shouldApproxBe` [ Left aimTopLeftCurve
+                             , Left aimBottomLeftCurve
                              , Right $ Line (R.V2 0 (1 / 3)) (R.V2 0.5 (1 / 3))
                              , Right
                                  $ Line (R.V2 0.5 (1 / 3)) (R.V2 0.5 (-1 / 3))
@@ -302,9 +302,9 @@ spec = do
                 ++ "circle segment when between ~4/3 and 4/3"
                 )
             $                aimShadowShape (4 / 3 - 1e-2)
-            `shouldApproxBe` [ Left topLeftCurve
-                             , Left bottomLeftCurve
-                             , Right bottomLine
+            `shouldApproxBe` [ Left aimTopLeftCurve
+                             , Left aimBottomLeftCurve
+                             , Right aimBottomLine
                              , Left $ CubicBezier
                                  (R.V2 0.9383697 0.34615636)
                                  (R.V2 0.9717603 0.25577885)
@@ -317,7 +317,7 @@ spec = do
                                  (R.V2 0.99245834 (-0.15927286))
                                  (R.V2 0.9717603 (-0.25577885))
                                  (R.V2 0.9383697 (-0.34615636))
-                             , Right topLine
+                             , Right aimTopLine
                              ]
         it
                 (  "should be half a circle, a rectangle and a circle segment "
