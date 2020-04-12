@@ -325,3 +325,8 @@ spec = do
                 )
             $          aimShadowShape (4 / 3)
             `shouldBe` aimShape
+
+    describe "boostShape"
+        $          it "should be a cut out circle"
+        $          boostShape
+        `shouldBe` []

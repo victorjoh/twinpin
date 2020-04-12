@@ -37,6 +37,7 @@ module Player
     , aimTopRightCurve
     , aimTopLine
     , aimShape
+    , boostShape
     )
 where
 
@@ -46,14 +47,15 @@ import           Circle
 import           Visual
 import           SDL                     hiding ( (^+^)
                                                 , (^*)
-                                                , lerp
                                                 )
 import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
 import           Graphics.Rasterific.Texture
 import           Graphics.Rasterific.Transformations
-import           Graphics.Rasterific.Linear     ( (^*) )
+import           Graphics.Rasterific.Linear     ( (^+^)
+                                                , (^*)
+                                                )
 import           Codec.Picture.Types
 import           Data.Word                      ( Word8 )
 import           Data.Int                       ( Int16 )
@@ -166,23 +168,22 @@ reloadTimeToAimShadowLength maxShadowWidth reloadTime =
 --                         ,' boostBottomLine , '
 --                           ' - , _ _ _ ,  '
 
-boostTopLeftCurve = snd $ breakCubicBezierAt circleQuadrant2 0.5
-boostBottomLeftCurve = fst $ breakCubicBezierAt circleQuadrant3 0.5
-boostTopRightCurve = transform (^* (2 / 3)) boostTopLeftCurve
-boostBottomRightCurve = transform (^* (2 / 3)) boostBottomLeftCurve
-boostTopLine =
-    Line (_cBezierX0 boostTopLeftCurve) (_cBezierX0 boostTopRightCurve)
-boostBottomLine =
-    Line (_cBezierX3 boostBottomLeftCurve) (_cBezierX3 boostBottomRightCurve)
+boostTopLeftCurve = snd $ breakCubicBezierAt circleQuadrant2 0.6
+boostBottomLeftCurve = fst $ breakCubicBezierAt circleQuadrant3 0.4
+
+rightDisplacement = (^+^) (R.V2 (2 * x) 0)
+    where R.V2 x _ = _cBezierX0 boostTopLeftCurve
+boostTopRightCurve =
+    transform rightDisplacement $ fst $ breakCubicBezierAt circleQuadrant1 0.4
+boostBottomRightCurve =
+    transform rightDisplacement $ snd $ breakCubicBezierAt circleQuadrant4 0.6
 
 boostShape :: [Either CubicBezier Line]
 boostShape =
-    [ Left boostTopLeftCurve
+    [ Left boostTopRightCurve
+    , Left boostTopLeftCurve
     , Left boostBottomLeftCurve
-    , Right boostBottomLine
     , Left boostBottomRightCurve
-    , Left boostTopRightCurve
-    , Right boostTopLine
     ]
 
 --                  , - ~ ~ ~ - ,
