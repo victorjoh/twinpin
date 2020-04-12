@@ -1,0 +1,8 @@
+cradle:
+  stack:
+    - path: ./test
+      component: "twinpin:test:twinpin-test"
+    - path: ./src
+      component: "twinpin:lib"
+    - path: ./app
+      component: "twinpin:exe:twinpin-exe"

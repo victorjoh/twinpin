@@ -44,13 +44,21 @@ stack ./install.hs build
 ```
 
 Cabal is needed for Haskell IDE Engine to work properly. To install and update
-cabal, run
+cabal, run the commands below. See [this
+issue](https://github.com/haskell/haskell-ide-engine/issues/658) for more
+information.
 ```
 stack install cabal-install
 cabal update
 ```
-as written in [this github issue for Haskell IDE
-Engine](https://github.com/haskell/haskell-ide-engine/issues/658).
+
+The Twinpin tests uses hspec-discover. It needs to be installed globally with
+the command below. See [this
+issue](https://github.com/haskell/haskell-ide-engine/issues/1500) for more
+information.
+```
+stack install hspec-discover
+```
 
 ## Twinpin code architecture
 The entry point is found in [Main]. [Main] contains all the IO, in fact all side
