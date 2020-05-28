@@ -10,8 +10,13 @@ module Player
     , playerMaxHealth
     , Deaths
     , ReloadTime
+    , BoostTime
     , playerSide
     , minFiringInterval
+    , boostRechargeTime
+    , boostDuration
+    , fullBoostCycle
+    , boostSpeed
     , playerSize
     , createPlayer
     , staticPlayerImage
@@ -65,13 +70,13 @@ import           Data.List                      ( foldl' )
 
 type AxisId = Word8
 type AxisPosition = Int16
+type ButtonId = Word8
 
-type Direction1D = Float
 -- Keep a 2D vector to cover the case when the aim stick is only moved in one
 -- axis. Keep the rotation to cover the case when the aim stick is moved to the
 -- default position (0, 0).
 data Aim2D = Aim2D Direction1D Direction1D Angle2D deriving (Show, Eq)
-type ReloadTime = DeltaTime
+type ReloadTime = Time
 data GunState = Firing | Idle deriving (Show, Eq)
 data Gun = Gun Aim2D ReloadTime GunState deriving (Show, Eq)
 
@@ -81,8 +86,10 @@ data Vitality = Vitality Deaths Health deriving (Show, Eq)
 data Color = Red | Blue deriving (Show, Eq)
 data PlayerId = PlayerId Color (Maybe JoystickID) deriving (Show, Eq)
 
-type BoostTime = DeltaTime
-data Movement = Movement Velocity2D BoostTime deriving (Show, Eq)
+type BoostTime = Time
+-- Keep the direction in addition to the velocity to record left trigger
+-- movements while in boost mode. In boost mode the velocity is locked.
+data Movement = Movement Velocity2D Direction2D BoostTime deriving (Show, Eq)
 
 data Player = Player Circle Movement Gun Vitality PlayerId deriving (Show, Eq)
 
@@ -98,12 +105,26 @@ playerRadius = playerSide / 2
 minFiringInterval :: ReloadTime
 minFiringInterval = 250
 
+boostDuration :: BoostTime
+boostDuration = 300
+
+boostRechargeTime :: BoostTime
+boostRechargeTime = 3000
+
+fullBoostCycle :: BoostTime
+fullBoostCycle = boostDuration + boostRechargeTime
+
+boostSpeed :: Float
+boostSpeed = 1.6
+
 axisPositionToVelocity :: Float
 axisPositionToVelocity = 0.000018
 
 triggerMinFireValue = 0
 minAxisPosition = 5000
+leftBumberButtonId = 4
 rightBumberButtonId = 5
+leftTriggerButtonId = 2
 rightTriggerButtonId = 5
 baseColor = PixelRGBA8 0xE6 0xE6 0xE6 255
 loadShadeColor = PixelRGBA8 0x16 0x0f 0x35 120
@@ -116,7 +137,7 @@ playerSize = V2 playerSide playerSide
 createPlayer :: Position2D -> Angle2D -> Color -> Maybe JoystickID -> Player
 createPlayer pos direction color joystickId = Player
     (Circle pos (playerSide / 2))
-    (Movement (V2 0 0) maxBound)
+    (Movement (V2 0 0) (V2 0 0) 0)
     (Gun (Aim2D 0 0 direction) 0 Idle)
     (Vitality 0 playerMaxHealth)
     (PlayerId color joystickId)
@@ -125,13 +146,15 @@ staticPlayerImage :: (ImageId, VectorImage)
 staticPlayerImage = (baseImageId, toSolidCircleImage baseColor playerRadius)
 
 drawPlayer :: Player -> [(Rectangle Float, Either VectorImage ImageId)]
-drawPlayer (Player outline _ gun (Vitality _ health) (PlayerId colorId _)) =
-    let Gun (Aim2D _ _ direction) reloadTime _ = gun
-        center        = R.V2 playerRadius playerRadius
-        textureArea   = toTextureArea outline
-        diameter      = toDiameter playerRadius
-        healthRadians = (1 - health) * (2 * pi)
-        shadowLength  = reloadTimeToAimShadowLength (4 / 3) reloadTime
+drawPlayer (Player outline movement gun vitality (PlayerId colorId _)) =
+    let center                        = R.V2 playerRadius playerRadius
+        textureArea                   = toTextureArea outline
+        diameter                      = toDiameter playerRadius
+        Vitality _ health             = vitality
+        healthRadians                 = (1 - health) * (2 * pi)
+        Movement _ _ boostTime        = movement
+        shadowLength = boostTimeToAimShadowLength (4 / 3) boostTime
+        Gun (Aim2D _ _ direction) _ _ = gun
     in  [ (textureArea, Right baseImageId)
         , ( textureArea
           , Left
@@ -155,10 +178,12 @@ aimColor :: Color -> PixelRGBA8
 aimColor Red  = PixelRGBA8 0xD3 0x5F 0x5F 255
 aimColor Blue = PixelRGBA8 0x5F 0x5F 0xD3 255
 
-reloadTimeToAimShadowLength :: Float -> ReloadTime -> Float
-reloadTimeToAimShadowLength maxShadowWidth reloadTime =
-    maxShadowWidth * fromIntegral reloadTime / fromIntegral minFiringInterval
-
+boostTimeToAimShadowLength :: Float -> BoostTime -> Float
+boostTimeToAimShadowLength maxShadowWidth boostTime =
+    maxShadowWidth * if boostTime > boostRechargeTime
+        then fromIntegral (fullBoostCycle - boostTime)
+            / fromIntegral boostDuration
+        else fromIntegral boostTime / fromIntegral boostRechargeTime
 --               , - ~ ~ ~ - ,
 --           , '               ' ,
 --         ,             topLine   ,
@@ -170,7 +195,7 @@ reloadTimeToAimShadowLength maxShadowWidth reloadTime =
 --         ,           bottomLine  ,
 --           ,                  , '
 --             ' - , _ _ _ ,  '
-rightCurveT = tan (1 / 3) * 2 /  pi
+rightCurveT = tan (1 / 3) * 2 / pi
 topRightCurve = fst $ breakCubicBezierAt circleQuadrant1 rightCurveT
 bottomRightCurve = snd $ breakCubicBezierAt circleQuadrant4 (1 - rightCurveT)
 bottomLine = Line (R.V2 0 (1 / 3)) (_cBezierX0 bottomRightCurve)
@@ -194,7 +219,7 @@ aimShadowShape len
     = []
     | len > 0 && len < 1 / 3
     = let
-          t                  = 2 / pi * acos (3 * len)
+          t                  = len * 3
           cutTopLeftCurve    = snd $ breakCubicBezierAt topLeftCurve (1 - t)
           cutBottomLeftCurve = fst $ breakCubicBezierAt bottomLeftCurve t
       in
@@ -251,23 +276,105 @@ updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
 updatePlayer events dt obstacles player =
     let Player shape movement gun vitality (PlayerId color maybeJoystickId)
             = player
-        Movement velocity lastBoost = movement
-        Gun aim reloadTime state    = gun
-        axisEvents                  = case maybeJoystickId of
+        Gun aim reloadTime state = gun
+        axisEvents               = case maybeJoystickId of
             Just joystickId ->
                 map (joyAxisEventAxis &&& joyAxisEventValue)
                     $ filter ((joystickId ==) . joyAxisEventWhich)
                     $ mapMaybe toJoyAxis events
             Nothing -> []
-        newVelocity   = foldl' updateVelocity velocity axisEvents
-        newAim        = foldl' updateAim aim axisEvents
-        newCircle     = moveCollidingCircle newVelocity dt obstacles shape
-        newReloadTime = max 0 $ reloadTime - dt
+        newAim = foldl' updateAim aim axisEvents
+        (newMovement, velocities) =
+                updateMovement dt maybeJoystickId events axisEvents aim movement
+        newCircle     = updateCircle velocities obstacles shape
+        newReloadTime = countDown reloadTime dt
     in  Player newCircle
-               (Movement newVelocity lastBoost)
+               newMovement
                (Gun newAim newReloadTime state)
                vitality
                (PlayerId color $ updateJoystick events =<< maybeJoystickId)
+
+type AxisEvent = (Word8, Int16)
+
+updateMovement
+    :: DeltaTime
+    -> Maybe JoystickID
+    -> [Event]
+    -> [AxisEvent]
+    -> Aim2D
+    -> Movement
+    -> (Movement, [(Velocity2D, Time)])
+updateMovement dt playerJoystickId events axisEvents aim movement =
+    let Aim2D _ _ aimAngle = aim
+        Movement velocity direction boostTime = movement
+        newBoostTime = updateBoostTime dt playerJoystickId events boostTime
+        newDirection = foldl' updateVelocity direction axisEvents
+        willNotBeBoosting = newBoostTime <= boostRechargeTime
+        newVelocity
+            | newBoostTime > boostTime = if newDirection /= V2 0 0
+                then boostSpeed @* toUnitVector newDirection
+                else boostSpeed @* angleToVector aimAngle
+            | willNotBeBoosting = newDirection
+            | otherwise = velocity
+        wasBoosting = boostTime >= boostRechargeTime
+        velocities  = if wasBoosting && willNotBeBoosting
+            then
+                [ (velocity   , boostTime - boostRechargeTime)
+                , (newVelocity, boostRechargeTime - newBoostTime)
+                ]
+            else [(newVelocity, dt)]
+    in  (Movement newVelocity newDirection newBoostTime, velocities)
+
+countDown :: Time -> DeltaTime -> Time
+countDown current dt = max 0 $ current - dt
+
+updateBoostTime
+    :: DeltaTime -> Maybe JoystickID -> [Event] -> BoostTime -> BoostTime
+updateBoostTime _ (Just playerJostickId) events 0 =
+    if any (isLeftBumperPressed playerJostickId) events
+            || any (isLeftTriggerPressed playerJostickId) events
+        then fullBoostCycle
+        else 0
+updateBoostTime dt _ _ current = countDown current dt
+
+isLeftBumperPressed :: JoystickID -> Event -> Bool
+isLeftBumperPressed = isButtonPressedEvent leftBumberButtonId
+
+isRightBumperPressed :: JoystickID -> Event -> Bool
+isRightBumperPressed = isButtonPressedEvent rightBumberButtonId
+
+isRightBumperReleased :: JoystickID -> Event -> Bool
+isRightBumperReleased = isButtonReleasedEvent rightBumberButtonId
+
+isLeftTriggerPressed :: JoystickID -> Event -> Bool
+isLeftTriggerPressed playerJoystickId (Event _ (JoyAxisEvent axisEventData)) =
+    let JoyAxisEventData joystickId buttonId amountPressed = axisEventData
+    in  playerJoystickId
+            == joystickId
+            && buttonId
+            == leftTriggerButtonId
+            && amountPressed
+            >  triggerMinFireValue
+isLeftTriggerPressed _ _ = False
+
+isButtonReleasedEvent :: ButtonId -> JoystickID -> Event -> Bool
+isButtonReleasedEvent buttonId joystickId =
+    hasButtonEventData
+        $ JoyButtonEventData joystickId buttonId JoyButtonReleased
+
+isButtonPressedEvent :: ButtonId -> JoystickID -> Event -> Bool
+isButtonPressedEvent buttonId joystickId =
+    hasButtonEventData $ JoyButtonEventData joystickId buttonId JoyButtonPressed
+
+hasButtonEventData :: JoyButtonEventData -> Event -> Bool
+hasButtonEventData eventData1 event = case event of
+    (Event _ (JoyButtonEvent eventData2)) -> eventData1 == eventData2
+    _ -> False
+
+updateCircle :: [(Velocity2D, DeltaTime)] -> Obstacles -> Circle -> Circle
+updateCircle [] _ shape = shape
+updateCircle ((velocity, dt) : vs) obstacles shape =
+    updateCircle vs obstacles $ moveCollidingCircle velocity dt obstacles shape
 
 updateJoystick :: [Event] -> JoystickID -> Maybe JoystickID
 updateJoystick events joystickId = if hasJoystickRemovedEvent events joystickId
@@ -328,14 +435,10 @@ eventToGunState playerJoystickId (Event _ (JoyAxisEvent axisEventData)) =
                 then Just Firing
                 else Just Idle
             else Nothing
-eventToGunState playerJoystickId (Event _ (JoyButtonEvent buttonEventData)) =
-    let JoyButtonEventData joystickId buttonId buttonState = buttonEventData
-    in  if joystickId == playerJoystickId && buttonId == rightBumberButtonId
-            then case buttonState of
-                JoyButtonPressed  -> Just Firing
-                JoyButtonReleased -> Just Idle
-            else Nothing
-eventToGunState _ _ = Nothing
+eventToGunState playerJoystickId event
+    | isRightBumperPressed playerJoystickId event = Just Firing
+    | isRightBumperReleased playerJoystickId event = Just Idle
+    | otherwise = Nothing
 
 setGun :: Gun -> Player -> Player
 setGun gun (Player shape velocity _ vitality playerId) =

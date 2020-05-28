@@ -14,7 +14,8 @@ import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as R
                                                 ( V2(..) )
 import           Approx
-import           VisualSpec                     ( )
+import           VisualUtil                     ( )
+import           SpaceUtil                      ( )
 
 spec :: Spec
 spec = do
@@ -29,6 +30,7 @@ spec = do
                   `shouldBe` replicate 2 (toTextureArea $ playerToCircle player)
 
     describe "updatePlayer" $ do
+        let ?epsilon = 0.0001
         it "moves the player according to the changed left stick position"
             $ let old        = createPlayer (V2 40 50) 0 Red (Just 3)
                   stickXPos  = JoyAxisEventData 3 0 10000
@@ -95,8 +97,8 @@ spec = do
                                            (Obstacles (createBounds 800 600) [])
                                            old
               in  getPlayerAngle new `shouldBe` oldAngle
-        it "ignores unused joystick buttons (left trigger)"
-            $ let unused = JoyAxisEventData 0 2 10000
+        it "ignores unused joystick buttons (x button)"
+            $ let unused = JoyButtonEventData 0 0 JoyButtonPressed
                   old    = createPlayer (V2 40 50) 0 Red (Just 0)
                   new    = updatePlayer (toEvents [unused])
                                         50
@@ -158,6 +160,104 @@ spec = do
                                      old
               in
                   new `shouldSatisfy` hasJoystick
+
+        let boostIsActivatedWhen event =
+                let old       = createPlayer (V2 0 0) 0 Red (Just 0)
+                    obstacles = Obstacles (createBounds 800 600) []
+                    new       = updatePlayer [event] 1 obstacles old
+                in  getBoostTime new `shouldBe` fullBoostCycle
+        it "activates the boost when left bumper button is pressed"
+            $ let leftBumperPressed =
+                      toEvent $ JoyButtonEventData 0 4 JoyButtonPressed
+              in  boostIsActivatedWhen leftBumperPressed
+        it "activates the boost when left trigger is pressed"
+            $ let leftTiggerPressed =
+                      toEvent $ JoyAxisEventData 0 2 (triggerMinFireValue + 1)
+              in  boostIsActivatedWhen leftTiggerPressed
+
+        let boostIsNotActivatedWhen event =
+                let old       = createPlayer (V2 0 0) 0 Red (Just 0)
+                    obstacles = Obstacles (createBounds 800 600) []
+                    new       = updatePlayer [event] 1 obstacles old
+                in  getBoostTime new `shouldBe` 0
+        it
+                (  "only activates the boost for the player who pressed the "
+                ++ "left bumper button"
+                )
+            $ let otherPlayerPressedLeftBumper =
+                      toEvent $ JoyButtonEventData 7 4 JoyButtonPressed
+              in  boostIsNotActivatedWhen otherPlayerPressedLeftBumper
+        it
+                (  "only activates the boost for the player who pressed the "
+                ++ "left trigger button"
+                )
+            $ let otherPlayerPressedLeftTrigger =
+                      toEvent $ JoyAxisEventData 7 2 (triggerMinFireValue + 1)
+              in  boostIsNotActivatedWhen otherPlayerPressedLeftTrigger
+        it "only activates the boost if the left trigger is pressed far enough"
+            $ let leftTiggerIsNotPressedFarEnough =
+                      toEvent $ JoyAxisEventData 0 2 (triggerMinFireValue - 1)
+              in  boostIsNotActivatedWhen leftTiggerIsNotPressedFarEnough
+        context "when boost button is pressed and player is stationary"
+            $ it "it boosts the player in the aim direction"
+            $ let
+                  old = createPlayer (V2 100 100) (pi * 3 / 2) Red (Just 0)
+                  obstacles = Obstacles (createBounds 800 600) []
+                  leftBumperPressed =
+                      toEvent $ JoyButtonEventData 0 4 JoyButtonPressed
+                  new = updatePlayer [leftBumperPressed] 10 obstacles old
+              in
+                  getPlayerPosition new
+                      `shouldBe` V2 100 (100 - 10 * boostSpeed)
+        context
+                (  "when the player does not have a joystick assigned in boost "
+                ++ "mode"
+                )
+            $ it "still uses up the boost"
+            $ let old = setPlayerBoostTime fullBoostCycle
+                      $ createPlayer (V2 100 100) 0 Red Nothing
+                  obstacles = Obstacles (createBounds 800 600) []
+                  new = updatePlayer [] 10 obstacles old
+              in  getBoostTime new `shouldBe` fullBoostCycle - 10
+        context "when boost is active" $ do
+            let leftBumperPressed = JoyButtonEventData 0 4 JoyButtonPressed
+                old =
+                    updatePlayer [toEvent leftBumperPressed] 0 obstacles
+                        $ setPlayerVelocity (V2 0.5 0)
+                        $ createPlayer (V2 50 300) 0 Red (Just 0)
+                obstacles                  = Obstacles (createBounds 800 600) []
+                expectedPositionAfter100ms = V2 (50 + 100 * boostSpeed) 300
+            it "moves the player fast"
+                $ let new = updatePlayer [] 100 obstacles old
+                  in  getPlayerPosition new
+                          `shouldBe` expectedPositionAfter100ms
+            it "locks the speed between two updates"
+                $ let
+                      new = updatePlayer [] 50 obstacles
+                          $ updatePlayer [] 50 obstacles old
+                  in  getPlayerPosition new
+                          `shouldBe` expectedPositionAfter100ms
+            it "leaves the movement unaffected by left thumbstick changes"
+                $ let leftStickMovement = toEvent $ JoyAxisEventData 0 1 20000
+                      new = updatePlayer [leftStickMovement] 100 obstacles old
+                  in  getPlayerPosition new
+                          `shouldBe` expectedPositionAfter100ms
+        context "when boost is deactivated"
+            $ it "moves the player in the direction of the left thumbstick"
+            $ let
+                  boostMovement = Movement (V2 1 0) (V2 1 0) fullBoostCycle
+                  old           = setMovement boostMovement
+                      $ createPlayer (V2 700 300) 0 Red (Just 0)
+                  obstacles = Obstacles (createBounds 800 600) []
+                  new       = updatePlayer [] boostDuration obstacles
+                      $ updatePlayer
+                            [createMoveDownEvent 0 10 50]
+                            50
+                            obstacles
+                            old
+              in
+                  getPlayerPosition new
+                      `shouldApproxBe` V2 (800 - playerRadius) 310
 
     describe "fireBullet" $ do
         it "fires a bullet if the right bumper button is pressed"
@@ -272,17 +372,18 @@ spec = do
         it "should be a circle segment if less than 1/3"
             $                aimShadowShape (1 / 6)
             `shouldApproxBe` [ Left $ CubicBezier
-                                 (R.V2 (-1 / 6) (-1 / sqrt 12))
-                                 (R.V2 (-0.26695037) (-0.22991335))
-                                 (R.V2 (-1 / 3) (-0.12264779))
+                                 (R.V2 (-0.23565605) (-0.23565605))
+                                 (R.V2 (-0.2959929) (-0.17531918))
+                                 (R.V2 (-1 / 3) (-9.1985844e-2))
                                  (R.V2 (-1 / 3) 0)
                              , Left $ CubicBezier
                                  (R.V2 (-1 / 3) 0)
-                                 (R.V2 (-1 / 3) 0.12264779)
-                                 (R.V2 (-0.26695037) 0.22991335)
-                                 (R.V2 (-1 / 6) (1 / sqrt 12))
-                             , Right $ Line (R.V2 (-1 / 6) (1 / sqrt 12))
-                                            (R.V2 (-1 / 6) (-1 / sqrt 12))
+                                 (R.V2 (-1 / 3) 9.1985844e-2)
+                                 (R.V2 (-0.2959929) 0.17531918)
+                                 (R.V2 (-0.23565605) 0.23565605)
+                             , Right $ Line
+                                 (R.V2 (-0.23565605) 0.23565605)
+                                 (R.V2 (-0.23565605) (-0.23565605))
                              ]
         it
                 (  "should be half a circle and a rectangle if between 0 and "
