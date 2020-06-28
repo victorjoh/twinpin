@@ -65,12 +65,14 @@ import           Data.Word                      ( Word8 )
 import           Data.Int                       ( Int16 )
 import           SDL.Raw.Types                  ( JoystickID )
 import           Data.Maybe
-import           Data.Tuple.Extra               ( (&&&) )
 import           Data.List                      ( foldl' )
 
 type AxisId = Word8
 type AxisPosition = Int16
 type ButtonId = Word8
+data AxisEvent = AxisEvent AxisId AxisPosition deriving Eq
+data ButtonEvent = ButtonEvent ButtonId JoyButtonState deriving Eq
+type InputEvent = Either AxisEvent ButtonEvent
 
 -- Keep a 2D vector to cover the case when the aim stick is only moved in one
 -- axis. Keep the rotation to cover the case when the aim stick is moved to the
@@ -184,6 +186,7 @@ boostTimeToAimShadowLength maxShadowWidth boostTime =
         then fromIntegral (fullBoostCycle - boostTime)
             / fromIntegral boostDuration
         else fromIntegral boostTime / fromIntegral boostRechargeTime
+
 --               , - ~ ~ ~ - ,
 --           , '               ' ,
 --         ,             topLine   ,
@@ -274,40 +277,37 @@ createVelocity x y | isCloseToDefault x && isCloseToDefault y = V2 0 0
 
 updatePlayer :: [Event] -> DeltaTime -> Obstacles -> Player -> Player
 updatePlayer events dt obstacles player =
-    let Player shape movement gun vitality (PlayerId color maybeJoystickId)
-            = player
-        Gun aim reloadTime state = gun
-        axisEvents               = case maybeJoystickId of
-            Just joystickId ->
-                map (joyAxisEventAxis &&& joyAxisEventValue)
-                    $ filter ((joystickId ==) . joyAxisEventWhich)
-                    $ mapMaybe toJoyAxis events
-            Nothing -> []
-        newAim = foldl' updateAim aim axisEvents
+    let
+        Player shape movement gun vitality playerId = player
+        PlayerId color maybeJoystickId = playerId
+        playerEvents                   = getPlayerEvents maybeJoystickId events
+        axisEvents                     = toAxisEvents playerEvents
+        newGun                         = updateGun axisEvents dt gun
+        Gun newAim _ _                 = newGun
+        buttonEvents                   = toButtonEvents playerEvents
         (newMovement, velocities) =
-                updateMovement dt maybeJoystickId events axisEvents aim movement
-        newCircle     = updateCircle velocities obstacles shape
-        newReloadTime = countDown reloadTime dt
-    in  Player newCircle
-               newMovement
-               (Gun newAim newReloadTime state)
-               vitality
-               (PlayerId color $ updateJoystick events =<< maybeJoystickId)
+            updateMovement dt buttonEvents axisEvents newAim movement
+        newCircle = updateCircle velocities obstacles shape
+        newPlayerId =
+            (PlayerId color $ updateJoystick events =<< maybeJoystickId)
+    in
+        Player newCircle newMovement newGun vitality newPlayerId
 
-type AxisEvent = (Word8, Int16)
+updateGun :: [AxisEvent] -> DeltaTime -> Gun -> Gun
+updateGun axisEvents dt (Gun aim reloadTime state) =
+    Gun (foldl' updateAim aim axisEvents) (countDown reloadTime dt) state
 
 updateMovement
     :: DeltaTime
-    -> Maybe JoystickID
-    -> [Event]
+    -> [ButtonEvent]
     -> [AxisEvent]
     -> Aim2D
     -> Movement
     -> (Movement, [(Velocity2D, Time)])
-updateMovement dt playerJoystickId events axisEvents aim movement =
+updateMovement dt buttonEvents axisEvents aim movement =
     let Aim2D _ _ aimAngle = aim
         Movement velocity direction boostTime = movement
-        newBoostTime = updateBoostTime dt playerJoystickId events boostTime
+        newBoostTime = updateBoostTime dt buttonEvents axisEvents boostTime
         newDirection = foldl' updateVelocity direction axisEvents
         willNotBeBoosting = newBoostTime <= boostRechargeTime
         newVelocity
@@ -329,47 +329,70 @@ countDown :: Time -> DeltaTime -> Time
 countDown current dt = max 0 $ current - dt
 
 updateBoostTime
-    :: DeltaTime -> Maybe JoystickID -> [Event] -> BoostTime -> BoostTime
-updateBoostTime _ (Just playerJostickId) events 0 =
-    if any (isLeftBumperPressed playerJostickId) events
-            || any (isLeftTriggerPressed playerJostickId) events
+    :: DeltaTime -> [ButtonEvent] -> [AxisEvent] -> BoostTime -> BoostTime
+updateBoostTime _ buttonEvents axisEvents 0 =
+    if any isLeftBumperPressed buttonEvents
+            || any isLeftTriggerPressed axisEvents
         then fullBoostCycle
         else 0
 updateBoostTime dt _ _ current = countDown current dt
 
-isLeftBumperPressed :: JoystickID -> Event -> Bool
-isLeftBumperPressed = isButtonPressedEvent leftBumberButtonId
+getPlayerEvents :: Maybe JoystickID -> [Event] -> [Event]
+getPlayerEvents Nothing _ = []
+getPlayerEvents (Just joystickId) events =
+    filter (hasJoystickId joystickId) events
 
-isRightBumperPressed :: JoystickID -> Event -> Bool
-isRightBumperPressed = isButtonPressedEvent rightBumberButtonId
+hasJoystickId :: JoystickID -> Event -> Bool
+hasJoystickId joystickId = maybe False (joystickId ==) . getJoystickId
 
-isRightBumperReleased :: JoystickID -> Event -> Bool
-isRightBumperReleased = isButtonReleasedEvent rightBumberButtonId
+getJoystickId :: Event -> Maybe JoystickID
+getJoystickId (Event _ payload) = case payload of
+    JoyAxisEvent (JoyAxisEventData joyId _ _) -> Just joyId
+    JoyButtonEvent (JoyButtonEventData joyId _ _) -> Just joyId
+    JoyDeviceEvent (JoyDeviceEventData _ joyId) -> Just joyId
+    _ -> Nothing
 
-isLeftTriggerPressed :: JoystickID -> Event -> Bool
-isLeftTriggerPressed playerJoystickId (Event _ (JoyAxisEvent axisEventData)) =
-    let JoyAxisEventData joystickId buttonId amountPressed = axisEventData
-    in  playerJoystickId
-            == joystickId
-            && buttonId
-            == leftTriggerButtonId
-            && amountPressed
-            >  triggerMinFireValue
-isLeftTriggerPressed _ _ = False
+toAxisEvents :: [Event] -> [AxisEvent]
+toAxisEvents = mapMaybe toAxisEvent
 
-isButtonReleasedEvent :: ButtonId -> JoystickID -> Event -> Bool
-isButtonReleasedEvent buttonId joystickId =
-    hasButtonEventData
-        $ JoyButtonEventData joystickId buttonId JoyButtonReleased
+toButtonEvents :: [Event] -> [ButtonEvent]
+toButtonEvents = mapMaybe toButtonEvent
 
-isButtonPressedEvent :: ButtonId -> JoystickID -> Event -> Bool
-isButtonPressedEvent buttonId joystickId =
-    hasButtonEventData $ JoyButtonEventData joystickId buttonId JoyButtonPressed
+toAxisEvent :: Event -> Maybe AxisEvent
+toAxisEvent (Event _ (JoyAxisEvent joyAxisEventData)) =
+    let JoyAxisEventData _ axisId position = joyAxisEventData
+    in  Just $ AxisEvent axisId position
+toAxisEvent _ = Nothing
 
-hasButtonEventData :: JoyButtonEventData -> Event -> Bool
-hasButtonEventData eventData1 event = case event of
-    (Event _ (JoyButtonEvent eventData2)) -> eventData1 == eventData2
-    _ -> False
+toButtonEvent :: Event -> Maybe ButtonEvent
+toButtonEvent (Event _ (JoyButtonEvent joyButtonEventData)) =
+    let JoyButtonEventData _ buttonId state = joyButtonEventData
+    in  Just $ ButtonEvent buttonId state
+toButtonEvent _ = Nothing
+
+toInputEvent :: Event -> Maybe InputEvent
+toInputEvent event = case toAxisEvent event of
+    Just axisEvent -> Just $ Left axisEvent
+    _              -> case toButtonEvent event of
+        Just buttonEvent -> Just $ Right buttonEvent
+        _                -> Nothing
+
+toInputEvents :: [Event] -> [InputEvent]
+toInputEvents = mapMaybe toInputEvent
+
+isLeftBumperPressed :: ButtonEvent -> Bool
+isLeftBumperPressed = (==) $ ButtonEvent leftBumberButtonId JoyButtonPressed
+
+isRightBumperPressed :: ButtonEvent -> Bool
+isRightBumperPressed = (==) $ ButtonEvent rightBumberButtonId JoyButtonPressed
+
+isRightBumperReleased :: ButtonEvent -> Bool
+isRightBumperReleased =
+    (==) $ ButtonEvent rightBumberButtonId JoyButtonReleased
+
+isLeftTriggerPressed :: AxisEvent -> Bool
+isLeftTriggerPressed (AxisEvent axisId axisPositon) =
+    axisId == leftTriggerButtonId && axisPositon > triggerMinFireValue
 
 updateCircle :: [(Velocity2D, DeltaTime)] -> Obstacles -> Circle -> Circle
 updateCircle [] _ shape = shape
@@ -388,20 +411,16 @@ hasJoystickRemovedEvent events joystickId = any
     )
     events
 
-toJoyAxis :: Event -> Maybe JoyAxisEventData
-toJoyAxis (Event _ (JoyAxisEvent joyAxisEventData)) = Just joyAxisEventData
-toJoyAxis _ = Nothing
-
-updateAim :: Aim2D -> (AxisId, AxisPosition) -> Aim2D
-updateAim (Aim2D x y direction) (axisId, axisPos) =
+updateAim :: Aim2D -> AxisEvent -> Aim2D
+updateAim (Aim2D x y direction) (AxisEvent axisId axisPos) =
     let pos = fromIntegral axisPos
     in  case axisId of
             3 -> Aim2D pos y $ createAngle pos y direction
             4 -> Aim2D x pos $ createAngle x pos direction
             _ -> Aim2D x y direction
 
-updateVelocity :: Velocity2D -> (AxisId, AxisPosition) -> Velocity2D
-updateVelocity (V2 x y) (axisId, axisPos) =
+updateVelocity :: Velocity2D -> AxisEvent -> Velocity2D
+updateVelocity (V2 x y) (AxisEvent axisId axisPos) =
     let newV = axisPositionToVelocity * fromIntegral axisPos
     in  case axisId of
             0 -> createVelocity newV y
@@ -411,9 +430,10 @@ updateVelocity (V2 x y) (axisId, axisPos) =
 fireBullet :: [Event] -> BulletId -> Player -> (Player, Maybe Bullet)
 fireBullet events bulletId player =
     let Player (Circle position _) _ gun _ (PlayerId _ joystickId) = player
-        Gun   aim reloadTime state     = gun
-        Aim2D _   _          direction = aim
-        newState                       = getGunState state joystickId events
+        Gun aim reloadTime state = gun
+        Aim2D _ _ direction = aim
+        playerEvents = getPlayerEvents joystickId events
+        newState = getGunState state $ toInputEvents playerEvents
         (newReloadTime, maybeBullet) = if reloadTime == 0 && newState == Firing
             then
                 ( minFiringInterval
@@ -422,23 +442,21 @@ fireBullet events bulletId player =
             else (reloadTime, Nothing)
     in  (setGun (Gun aim newReloadTime newState) player, maybeBullet)
 
-getGunState :: GunState -> Maybe JoystickID -> [Event] -> GunState
-getGunState gunState (Just joystickId) events =
-    foldl' seq gunState $ mapMaybe (eventToGunState joystickId) events
-getGunState gunState Nothing _ = gunState
+getGunState :: GunState -> [InputEvent] -> GunState
+getGunState gunState events =
+    foldl' seq gunState $ mapMaybe eventToGunState events
 
-eventToGunState :: JoystickID -> Event -> Maybe GunState
-eventToGunState playerJoystickId (Event _ (JoyAxisEvent axisEventData)) =
-    let JoyAxisEventData joystickId buttonId amountPressed = axisEventData
-    in  if joystickId == playerJoystickId && buttonId == rightTriggerButtonId
-            then if amountPressed > triggerMinFireValue
-                then Just Firing
-                else Just Idle
-            else Nothing
-eventToGunState playerJoystickId event
-    | isRightBumperPressed playerJoystickId event = Just Firing
-    | isRightBumperReleased playerJoystickId event = Just Idle
-    | otherwise = Nothing
+eventToGunState :: InputEvent -> Maybe GunState
+eventToGunState (Left (AxisEvent axisId amountPressed)) =
+    if axisId == rightTriggerButtonId
+        then if amountPressed > triggerMinFireValue
+            then Just Firing
+            else Just Idle
+        else Nothing
+eventToGunState (Right buttonEvent)
+    | isRightBumperPressed buttonEvent  = Just Firing
+    | isRightBumperReleased buttonEvent = Just Idle
+    | otherwise                         = Nothing
 
 setGun :: Gun -> Player -> Player
 setGun gun (Player shape velocity _ vitality playerId) =
