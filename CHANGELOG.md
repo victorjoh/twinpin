@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2020-06-29
 ### Added
 * Added player boost capabilities triggered with left bumper button or left
   trigger button.
@@ -68,7 +68,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 * Player to player collision
 * Pillars that limits the positions of the players and bullets
 
-[Unreleased]: https://github.com/victorjoh/twinpin/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/victorjoh/twinpin/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/victorjoh/twinpin/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/victorjoh/twinpin/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/victorjoh/twinpin/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/victorjoh/twinpin/compare/v0.2.0...v0.2.1
