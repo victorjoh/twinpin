@@ -325,35 +325,51 @@ instance Movement CircularMovement where
         start'  = startPosition - trajectoryCenter
 
     collideWithCircles radiusInMotion movement obstacles =
-        fmap
-                ( pairToWaypoint
-                . bimap (+ trajectoryCenter) (+@ trajectoryCenter)
-                . second (decreaseRadius radiusInMotion)
-                )
-            $ foldr (getClosestCircleCollision current') Nothing
-            $ concatMap
-                  (traverseToFst $ getCircleCircleIntersections trajectoryRadius
-                  )
-            $ map (increaseRadius radiusInMotion)
-            $ filter
-                  (not . hasPositionInQuadrant
-                      current'
-                      (getPerpendicularTo current' (-startDirection))
-                  )
-            $ filter
-                  (hasAreaOnSide (getLine2D current' trajectoryCenter')
-                                 startDirection
-                  )
-                  obstacles'
+        fmap pairToWaypoint
+            $ fmap (offsetIntersection trajectoryCenter (-radiusInMotion))
+            $ foldr (getClosestCircleCollision startPosition') Nothing
+            $ toCircleIntersections trajectoryRadius
+            $ filter (isCollisionPossible startPosition' startDirection)
+            $ map (offsetCircle (-trajectoryCenter) radiusInMotion) obstacles
       where
         CircularMovement start        _               trajectory = movement
         (                startPosition, startDirection)          = start
         Circle trajectoryCenter trajectoryRadius = trajectory
-        trajectoryCenter' = V2 0 0
-        current'          = startPosition - trajectoryCenter
-        (-@) (Circle pos r) offset = Circle (pos - offset) r
-        (+@) (Circle pos r) offset = Circle (pos + offset) r
-        obstacles' = map (-@ trajectoryCenter) obstacles
+        startPosition' = startPosition - trajectoryCenter
+
+offsetCircle :: Position2D -> Radius -> Circle -> Circle
+offsetCircle positionOffset radiusOffset (Circle position radius) =
+    Circle (position + positionOffset) (radius + radiusOffset)
+
+type CircleIntersection = (Position2D, Circle)
+
+offsetIntersection
+    :: Position2D -> Radius -> CircleIntersection -> CircleIntersection
+offsetIntersection positionOffset radiusOffset =
+    bimap (+ positionOffset) (offsetCircle positionOffset radiusOffset)
+
+-- all positions are relative to the circle that has the first argument radius
+toCircleIntersections :: Radius -> [Circle] -> [CircleIntersection]
+toCircleIntersections radius =
+    concatMap (traverseToFst $ getCircleCircleIntersections radius)
+
+data Quadrant = Quadrant Vector2D Vector2D
+
+-- all positions are relative to the trajectory center
+isCollisionPossible :: Position2D -> Vector2D -> Circle -> Bool
+isCollisionPossible startPosition' startDirection =
+    hasAreaOnSide (getLine2D startPosition' (V2 0 0)) startDirection
+        &&& (not . (impossibleQuandrant `containsPosition`) . getPosition)
+  where
+    impossibleQuandrant = Quadrant
+        startPosition'
+        (startPosition' `rotate90Towards` (-startDirection))
+
+(&&&) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
+(&&&) p1 p2 v = p1 v && p2 v
+
+getPosition :: Circle -> Position2D
+getPosition (Circle position _) = position
 
 getClosestBoundsCollision
     :: Position2D -> Position2D -> Maybe Position2D -> Maybe Position2D
@@ -361,12 +377,8 @@ getClosestBoundsCollision _ collision Nothing = Just collision
 getClosestBoundsCollision reference p1 (Just p2) =
     if distance reference p1 < distance reference p2 then Just p1 else Just p2
 
-getPerpendicularTo :: Vector2D -> Vector2D -> Vector2D
-getPerpendicularTo (V2 x y) = flipToClosest (V2 y (-x))
-
-hasPositionInQuadrant :: Vector2D -> Vector2D -> Circle -> Bool
-hasPositionInQuadrant v1 v2 (Circle pos _) =
-    pos `dot` v1 > 0 && pos `dot` v2 > 0
+containsPosition :: Quadrant -> Position2D -> Bool
+containsPosition (Quadrant v1 v2) pos = pos `dot` v1 > 0 && pos `dot` v2 > 0
 
 hasAreaOnSide :: Line2D -> Vector2D -> Circle -> Bool
 hasAreaOnSide l side (Circle pos r) =
