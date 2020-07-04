@@ -146,5 +146,9 @@ toUnitVector v = v /@ norm v
 scalarProjection :: Vector2D -> Vector2D -> Float
 scalarProjection v direction = v `dot` toUnitVector direction
 
+rotate90Towards :: Vector2D -> Vector2D -> Vector2D
+rotate90Towards (V2 x y) = flipToClosest $ V2 (-y) x
+
 flipToClosest :: Vector2D -> Vector2D -> Vector2D
 flipToClosest v target = if target `dot` v > 0 then v else -v
+

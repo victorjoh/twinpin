@@ -164,24 +164,24 @@ mapIntersectedPlayers f (Movables nextBulletId bullets intersectedPlayers) =
     Movables nextBulletId bullets (f intersectedPlayers)
 
 updatePlayers :: [Event] -> DeltaTime -> Obstacles -> Movables -> Movables
-updatePlayers events dt obstacles = mapIntersectedPlayers $ godFoldr
-    ( concatApply
+updatePlayers events dt obstacles = mapIntersectedPlayers $ fullContextFoldr
+    ( applyConcat
     $ (mapPlayer . updatePlayer events dt)
     . addToObstacles obstacles
     )
 
 -- Fold a list from the right with a function that depends on all folded values
 -- and all non-folded values when folding a single value.
-godFoldr :: ([a] -> a -> [b] -> b) -> [a] -> [b]
-godFoldr f l = godFoldr' f (reverse l) []
+fullContextFoldr :: ([a] -> a -> [b] -> b) -> [a] -> [b]
+fullContextFoldr f l = fullContextFoldr' f (reverse l) []
 
-godFoldr' :: ([a] -> a -> [b] -> b) -> [a] -> [b] -> [b]
-godFoldr' _ [] changed = changed
-godFoldr' f (next : remaining) changed =
-    godFoldr' f remaining (f remaining next changed : changed)
+fullContextFoldr' :: ([a] -> a -> [b] -> b) -> [a] -> [b] -> [b]
+fullContextFoldr' _ [] changed = changed
+fullContextFoldr' f (next : remaining) changed =
+    fullContextFoldr' f remaining (f remaining next changed : changed)
 
-concatApply :: ([a] -> a -> a) -> [a] -> a -> [a] -> a
-concatApply f remaining next changed = f (remaining ++ changed) next
+applyConcat :: ([a] -> a -> a) -> [a] -> a -> [a] -> a
+applyConcat f remaining next changed = f (remaining ++ changed) next
 
 addToObstacles :: Obstacles -> [IntersectedPlayer] -> Obstacles
 addToObstacles (Obstacles bounds pillars) intersectedPlayers =
