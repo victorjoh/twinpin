@@ -257,7 +257,7 @@ instance Movement StraightMovement where
 
     collideWithBounds radiusInMotion movement bounds =
         fmap (Waypoint BoundsCollision . (+ startPosition))
-            $ foldr (getClosestBoundsCollision startPosition') Nothing
+            $ foldr (getClosestPositionTo startPosition') Nothing
             $ mapMaybe
                   (getLineIntersection2D (getLine2D startPosition' endPosition')
                   . offsetDistanceToOrigin2D (-radiusInMotion)
@@ -271,8 +271,8 @@ instance Movement StraightMovement where
         startPosition  = getStartPosition movement
 
     collideWithCircles radiusInMotion movement obstacles =
-        fmap (toWaypoint . second (decreaseRadius radiusInMotion))
-            $ foldr (getClosestCircleCollision startPosition) Nothing
+        fmap (intersectionToWaypoint . second (decreaseRadius radiusInMotion))
+            $ foldr (getClosestCircleIntersectionTo startPosition) Nothing
             $ concatMap
                   (traverseToFst $ getMovementCircleIntersections movement)
             $ filter (isInFrontOf startPosition endPosition)
@@ -282,8 +282,9 @@ instance Movement StraightMovement where
             (to - from) `dot` (obstacle - from) > epsilon
         StraightMovement startPosition endPosition = movement
 
-toWaypoint :: CircleIntersection -> Waypoint
-toWaypoint (position, shape) = Waypoint (CircleCollision shape) position
+intersectionToWaypoint :: CircleIntersection -> Waypoint
+intersectionToWaypoint (position, shape) =
+    Waypoint (CircleCollision shape) position
 
 getMovementCircleIntersections :: StraightMovement -> Circle -> [Position2D]
 getMovementCircleIntersections (StraightMovement startPosition endPosition) shape
@@ -303,17 +304,6 @@ getMovementCircleIntersections (StraightMovement startPosition endPosition) shap
               )
     where Circle circlePosition circleRadius = shape
 
-getClosestCircleCollision
-    :: Position2D
-    -> CircleIntersection
-    -> Maybe CircleIntersection
-    -> Maybe CircleIntersection
-getClosestCircleCollision _ collision Nothing = Just collision
-getClosestCircleCollision reference (p1, c1) (Just (p2, c2)) =
-    if distance reference p1 < distance reference p2
-        then Just (p1, c1)
-        else Just (p2, c2)
-
 instance Movement CircularMovement where
     getStartPosition (CircularMovement (startPosition, _) _ _) = startPosition
     getEndPosition (CircularMovement _ (endPosition, _) _) = endPosition
@@ -325,7 +315,7 @@ instance Movement CircularMovement where
             & filter (isLineCollisionPossible start' end')
             & map (offsetDistanceToOrigin2D (-radiusInMotion))
             & concatMap (getCircleLineIntersections trajectoryRadius)
-            & foldr (getClosestBoundsCollision startPosition') Nothing
+            & foldr (getClosestPositionTo startPosition') Nothing
             & fmap (+ trajectoryCenter)
             & fmap (Waypoint BoundsCollision)
       where
@@ -340,9 +330,9 @@ instance Movement CircularMovement where
             & map (offsetCircle (-trajectoryCenter) radiusInMotion)
             & filter (isCircleCollisionPossible start')
             & concatMap (getCircleIntersections trajectoryRadius)
-            & foldr (getClosestCircleCollision startPosition') Nothing
+            & foldr (getClosestCircleIntersectionTo startPosition') Nothing
             & fmap (offsetIntersection trajectoryCenter (-radiusInMotion))
-            & fmap toWaypoint
+            & fmap intersectionToWaypoint
       where
         CircularMovement start _ trajectory = movement
         Circle trajectoryCenter trajectoryRadius = trajectory
@@ -389,11 +379,23 @@ isCircleCollisionPossible (startPosition', startDirection) =
 getPosition :: Circle -> Position2D
 getPosition (Circle position _) = position
 
-getClosestBoundsCollision
+getClosestCircleIntersectionTo
+    :: Position2D
+    -> CircleIntersection
+    -> Maybe CircleIntersection
+    -> Maybe CircleIntersection
+getClosestCircleIntersectionTo _ intersection Nothing = Just intersection
+getClosestCircleIntersectionTo ref i1@(p1, _) (Just i2@(p2, _)) =
+    if isFirstPositionCloserTo ref p1 p2 then Just i1 else Just i2
+
+getClosestPositionTo
     :: Position2D -> Position2D -> Maybe Position2D -> Maybe Position2D
-getClosestBoundsCollision _ collision Nothing = Just collision
-getClosestBoundsCollision reference p1 (Just p2) =
-    if distance reference p1 < distance reference p2 then Just p1 else Just p2
+getClosestPositionTo _ intersection Nothing = Just intersection
+getClosestPositionTo ref p1 (Just p2) =
+    if isFirstPositionCloserTo ref p1 p2 then Just p1 else Just p2
+
+isFirstPositionCloserTo :: Position2D -> Position2D -> Position2D -> Bool
+isFirstPositionCloserTo ref p1 p2 = distance ref p1 < distance ref p2
 
 containsPosition :: Quadrant -> Position2D -> Bool
 containsPosition (Quadrant v1 v2) pos = pos `dot` v1 > 0 && pos `dot` v2 > 0
