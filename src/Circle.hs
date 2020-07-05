@@ -17,9 +17,13 @@ import           Space
 import           Visual
 import           SDL.Video.Renderer             ( Rectangle(..) )
 import           SDL.Vect
-import           Graphics.Rasterific     hiding ( V2(..) )
+import           Graphics.Rasterific     hiding ( V2(..)
+                                                , circle
+                                                )
 import qualified Graphics.Rasterific           as Rasterific
-                                                ( V2(..) )
+                                                ( V2(..)
+                                                , circle
+                                                )
 import           Graphics.Rasterific.Texture
 import           Codec.Picture.Types
 import           Data.Maybe
@@ -61,7 +65,8 @@ toSolidCircleImage color radius =
     where diameter = toDiameter radius
 
 toDrawing :: Radius -> Drawing px ()
-toDrawing radius = fill $ circle (Rasterific.V2 radius radius) radius
+toDrawing radius =
+    fill $ Rasterific.circle (Rasterific.V2 radius radius) radius
 
 toDiameter :: Radius -> Diameter
 toDiameter = (*) 2
@@ -270,39 +275,48 @@ instance Movement StraightMovement where
         endPosition'   = getEndPosition movement - startPosition
         startPosition  = getStartPosition movement
 
-    collideWithCircles radiusInMotion movement obstacles =
-        fmap (intersectionToWaypoint . second (decreaseRadius radiusInMotion))
-            $ foldr (getClosestCircleIntersectionTo startPosition) Nothing
-            $ concatMap
-                  (traverseToFst $ getMovementCircleIntersections movement)
-            $ filter (isInFrontOf startPosition endPosition)
-            $ map (increaseRadius radiusInMotion) obstacles
-      where
-        isInFrontOf from to (Circle obstacle _) =
-            (to - from) `dot` (obstacle - from) > epsilon
-        StraightMovement startPosition endPosition = movement
+    collideWithCircles radiusInMotion movement circles =
+        circles
+            & map (increaseRadius radiusInMotion)
+            & filter (isInFrontOf movement)
+            & concatMap (getMovementCircleIntersections movement)
+            & foldr (getClosestCircleIntersectionTo startPosition) Nothing
+            & fmap (second (decreaseRadius radiusInMotion))
+            & fmap intersectionToWaypoint
+        where startPosition = getStartPosition movement
+
+isInFrontOf :: StraightMovement -> Circle -> Bool
+isInFrontOf (StraightMovement from to) (Circle obstacle _) =
+    (to - from) `dot` (obstacle - from) > epsilon
 
 intersectionToWaypoint :: CircleIntersection -> Waypoint
-intersectionToWaypoint (position, shape) =
-    Waypoint (CircleCollision shape) position
+intersectionToWaypoint (position, circle) =
+    Waypoint (CircleCollision circle) position
 
-getMovementCircleIntersections :: StraightMovement -> Circle -> [Position2D]
-getMovementCircleIntersections (StraightMovement startPosition endPosition) shape
-    = filter
-            (\collision ->
-                epsilon
-                    + distance startPosition endPosition
-                    > distance startPosition collision
-            )
-        $ map
-              (+ circlePosition)
-              (getCircleLineIntersections
-                  circleRadius
-                  (getLine2D (startPosition - circlePosition)
-                             (endPosition - circlePosition)
-                  )
-              )
-    where Circle circlePosition circleRadius = shape
+getMovementCircleIntersections
+    :: StraightMovement -> Circle -> [CircleIntersection]
+getMovementCircleIntersections movement =
+    traverseToFst $ getMovementCircleIntersections' movement
+
+getMovementCircleIntersections' :: StraightMovement -> Circle -> [Position2D]
+getMovementCircleIntersections' movement circle =
+    movement
+        & offsetStraightMovement (-circlePosition)
+        & movementToLine2D
+        & getCircleLineIntersections circleRadius
+        & map (+ circlePosition)
+        & filter (not . isFirstPositionCloserTo startPosition endPosition)
+  where
+    StraightMovement startPosition endPosition = movement
+    Circle circlePosition circleRadius = circle
+
+offsetStraightMovement :: Vector2D -> StraightMovement -> StraightMovement
+offsetStraightMovement offset (StraightMovement startPosition endPosition) =
+    StraightMovement (startPosition + offset) (endPosition + offset)
+
+movementToLine2D :: StraightMovement -> Line2D
+movementToLine2D (StraightMovement startPosition endPosition) =
+    getLine2D startPosition endPosition
 
 instance Movement CircularMovement where
     getStartPosition (CircularMovement (startPosition, _) _ _) = startPosition
@@ -325,8 +339,8 @@ instance Movement CircularMovement where
         (startPosition', _) = start'
         (Circle trajectoryCenter trajectoryRadius) = trajectory
 
-    collideWithCircles radiusInMotion movement obstacles =
-        obstacles
+    collideWithCircles radiusInMotion movement circles =
+        circles
             & map (offsetCircle (-trajectoryCenter) radiusInMotion)
             & filter (isCircleCollisionPossible start')
             & concatMap (getCircleIntersections trajectoryRadius)
