@@ -34,7 +34,7 @@ import           Data.Function                  ( (&) )
 type Radius = Float
 type Diameter = Float
 data Circle = Circle Position2D Radius deriving (Show, Eq)
-data Waypoint = Waypoint Position2D WaypointType deriving (Show)
+data Waypoint = Waypoint WaypointType Position2D deriving (Show)
 data WaypointType = CircleCollision Circle | BoundsCollision | MovementFinished
                     deriving (Show)
 data Obstacles = Obstacles Bounds2D [Circle] deriving (Show, Eq)
@@ -114,7 +114,7 @@ moveFromWaypoint radiusInMotion waypoint endPosition obstacles =
             moveAlongCircle radiusInMotion movement collidedWith obstacles
         MovementFinished -> waypointPosition
   where
-    Waypoint waypointPosition waypointType = waypoint
+    Waypoint waypointType waypointPosition = waypoint
     movement = StraightMovement waypointPosition endPosition
 
 moveAlongBounds :: Radius -> StraightMovement -> Obstacles -> Position2D
@@ -123,7 +123,7 @@ moveAlongBounds radiusInMotion movement (Obstacles bounds circles) =
         newEndPosition = limitPosition2D (getEndPosition movement) centerBounds
     in  maybe
             newEndPosition
-            (\(Waypoint position _) -> position)
+            (\(Waypoint _ position) -> position)
             (collideWithCircles
                 radiusInMotion
                 (StraightMovement (getStartPosition movement) newEndPosition)
@@ -200,8 +200,8 @@ moveAlongCircle radiusInMotion movement touchingCircle obstacles =
 endMovementOnCircle
     :: Radius -> CircularMovement -> Circle -> Obstacles -> Position2D
 endMovementOnCircle radiusInMotion movement touchedCircle obstacles =
-    let Obstacles bounds           circles = obstacles
-        Waypoint  waypointPosition _       = getNextWaypoint
+    let Obstacles bounds circles          = obstacles
+        Waypoint  _      waypointPosition = getNextWaypoint
             radiusInMotion
             movement
             (Obstacles bounds (delete touchedCircle circles))
@@ -219,7 +219,7 @@ movePastCircle radiusInMotion movement touchedCircle endPosition obstacles =
         Obstacles bounds circles               = obstacles
         nonTouchedCircles                      = delete touchedCircle circles
         CircularMovement _ (exit, _) _         = movement
-        Waypoint waypointPosition waypointType = getNextWaypoint
+        Waypoint waypointType waypointPosition = getNextWaypoint
             radiusInMotion
             movement
             (Obstacles bounds nonTouchedCircles)
@@ -238,7 +238,7 @@ movePastCircle radiusInMotion movement touchedCircle endPosition obstacles =
 getNextWaypoint :: Movement m => Radius -> m -> Obstacles -> Waypoint
 getNextWaypoint radiusInMotion movement (Obstacles bounds circles) = foldr
     (getClosestWaypoint (getStartPosition movement))
-    (Waypoint (getEndPosition movement) MovementFinished)
+    (Waypoint MovementFinished (getEndPosition movement))
     (catMaybes
         [ collideWithBounds radiusInMotion movement bounds
         , collideWithCircles radiusInMotion movement circles
@@ -247,8 +247,8 @@ getNextWaypoint radiusInMotion movement (Obstacles bounds circles) = foldr
 
 getClosestWaypoint :: Position2D -> Waypoint -> Waypoint -> Waypoint
 getClosestWaypoint reference w1 w2 =
-    let (Waypoint p1 _) = w1
-        (Waypoint p2 _) = w2
+    let (Waypoint _ p1) = w1
+        (Waypoint _ p2) = w2
     in  if distance reference p1 < distance reference p2 then w1 else w2
 
 instance Movement StraightMovement where
@@ -256,7 +256,7 @@ instance Movement StraightMovement where
     getEndPosition (StraightMovement _ endPosition) = endPosition
 
     collideWithBounds radiusInMotion movement bounds =
-        fmap (flip Waypoint BoundsCollision . (+ startPosition))
+        fmap (Waypoint BoundsCollision . (+ startPosition))
             $ foldr (getClosestBoundsCollision startPosition') Nothing
             $ mapMaybe
                   (getLineIntersection2D (getLine2D startPosition' endPosition')
@@ -283,7 +283,7 @@ instance Movement StraightMovement where
         StraightMovement startPosition endPosition = movement
 
 toWaypoint :: CircleIntersection -> Waypoint
-toWaypoint (position, shape) = Waypoint position $ CircleCollision shape
+toWaypoint (position, shape) = Waypoint (CircleCollision shape) position
 
 getMovementCircleIntersections :: StraightMovement -> Circle -> [Position2D]
 getMovementCircleIntersections (StraightMovement startPosition endPosition) shape
@@ -319,28 +319,27 @@ instance Movement CircularMovement where
     getEndPosition (CircularMovement _ (endPosition, _) _) = endPosition
 
     collideWithBounds radiusInMotion movement bounds =
-        fmap (flip Waypoint BoundsCollision . (+ trajectoryCenter))
-            $ foldr (getClosestBoundsCollision start') Nothing
-            $ concatMap (getCircleLineIntersections trajectoryRadius)
-            $ map (offsetDistanceToOrigin2D (-radiusInMotion))
-            $ filter
-                  ( isLineBetween2D startDirection escapeDirection
-                  . offsetLine2D (-start')
-                  )
-            $ boundsToLines2D bounds'
+        bounds
+            & offsetBounds2D (-trajectoryCenter)
+            & boundsToLines2D
+            & filter (isLineCollisionPossible start' end')
+            & map (offsetDistanceToOrigin2D (-radiusInMotion))
+            & concatMap (getCircleLineIntersections trajectoryRadius)
+            & foldr (getClosestBoundsCollision startPosition') Nothing
+            & fmap (+ trajectoryCenter)
+            & fmap (Waypoint BoundsCollision)
       where
-        CircularMovement start        end              trajectory = movement
-        (                startPosition, startDirection )          = start
-        (                _            , escapeDirection)          = end
+        CircularMovement start end trajectory = movement
+        start'              = offsetTrajectoryInstant (-trajectoryCenter) start
+        end'                = offsetTrajectoryInstant (-trajectoryCenter) end
+        (startPosition', _) = start'
         (Circle trajectoryCenter trajectoryRadius) = trajectory
-        bounds' = offsetBounds2D (-trajectoryCenter) bounds
-        start'  = startPosition - trajectoryCenter
 
     collideWithCircles radiusInMotion movement obstacles =
         obstacles
             & map (offsetCircle (-trajectoryCenter) radiusInMotion)
-            & filter (isCollisionPossible start')
-            & toCircleIntersections trajectoryRadius
+            & filter (isCircleCollisionPossible start')
+            & concatMap (getCircleIntersections trajectoryRadius)
             & foldr (getClosestCircleCollision startPosition') Nothing
             & fmap (offsetIntersection trajectoryCenter (-radiusInMotion))
             & fmap toWaypoint
@@ -349,6 +348,11 @@ instance Movement CircularMovement where
         Circle trajectoryCenter trajectoryRadius = trajectory
         start' = offsetTrajectoryInstant (-trajectoryCenter) start
         (startPosition', _)                 = start'
+
+-- all positions are relative to the trajectory center
+isLineCollisionPossible :: TrajectoryStart -> TrajectoryEnd -> Line2D -> Bool
+isLineCollisionPossible (startPosition', startDirection) (_, endDirection) =
+    isLineBetween2D startDirection endDirection . offsetLine2D (-startPosition')
 
 offsetCircle :: Position2D -> Radius -> Circle -> Circle
 offsetCircle positionOffset radiusOffset (Circle position radius) =
@@ -363,15 +367,15 @@ offsetTrajectoryInstant :: Position2D -> TrajectoryInstant -> TrajectoryInstant
 offsetTrajectoryInstant offset = first (+ offset)
 
 -- all positions are relative to the circle that has the first argument radius
-toCircleIntersections :: Radius -> [Circle] -> [CircleIntersection]
-toCircleIntersections radius =
-    concatMap (traverseToFst $ getCircleCircleIntersections radius)
+getCircleIntersections :: Radius -> Circle -> [CircleIntersection]
+getCircleIntersections radius =
+    traverseToFst $ getCircleCircleIntersections radius
 
 data Quadrant = Quadrant Vector2D Vector2D
 
 -- all positions are relative to the trajectory center
-isCollisionPossible :: TrajectoryInstant -> Circle -> Bool
-isCollisionPossible (startPosition', startDirection) =
+isCircleCollisionPossible :: TrajectoryInstant -> Circle -> Bool
+isCircleCollisionPossible (startPosition', startDirection) =
     hasAreaOnSide (getLine2D startPosition' (V2 0 0)) startDirection
         &&& (not . (impossibleQuandrant `containsPosition`) . getPosition)
   where
