@@ -261,19 +261,18 @@ instance Movement StraightMovement where
     getEndPosition (StraightMovement _ endPosition) = endPosition
 
     collideWithBounds radiusInMotion movement bounds =
-        fmap (Waypoint BoundsCollision . (+ startPosition))
-            $ foldr (getClosestPositionTo startPosition') Nothing
-            $ mapMaybe
-                  (getLineIntersection2D (getLine2D startPosition' endPosition')
-                  . offsetDistanceToOrigin2D (-radiusInMotion)
-                  )
-            $ filter (isLineCrossingVector2D endPosition')
-            $ boundsToLines2D bounds'
+        bounds
+            & offsetBounds2D (-startPosition)
+            & boundsToLines2D
+            & filter (isLineCrossingVector2D $ getEndPosition movement')
+            & map (offsetDistanceToOrigin2D (-radiusInMotion))
+            & mapMaybe (getLineIntersection2D $ movementToLine2D movement')
+            & foldr (getClosestPositionTo (V2 0 0)) Nothing
+            & fmap (+ startPosition)
+            & fmap (Waypoint BoundsCollision)
       where
-        bounds'        = offsetBounds2D (-startPosition) bounds
-        startPosition' = V2 0 0
-        endPosition'   = getEndPosition movement - startPosition
-        startPosition  = getStartPosition movement
+        startPosition = getStartPosition movement
+        movement'     = offsetStraightMovement (-startPosition) movement
 
     collideWithCircles radiusInMotion movement circles =
         circles
@@ -307,8 +306,8 @@ getMovementCircleIntersections' movement circle =
         & map (+ circlePosition)
         & filter (not . isFirstPositionCloserTo startPosition endPosition)
   where
-    StraightMovement startPosition endPosition = movement
-    Circle circlePosition circleRadius = circle
+    StraightMovement startPosition  endPosition  = movement
+    Circle           circlePosition circleRadius = circle
 
 offsetStraightMovement :: Vector2D -> StraightMovement -> StraightMovement
 offsetStraightMovement offset (StraightMovement startPosition endPosition) =
