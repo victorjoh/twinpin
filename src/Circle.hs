@@ -52,9 +52,10 @@ type CircleIntersection = (Position2D, Circle)
 type TrajectoryInstant = (Position2D, Direction2D)
 type TrajectoryStart = TrajectoryInstant
 type TrajectoryEnd = TrajectoryInstant
+type CirclePath = Circle
 data CircularMovement = CircularMovement TrajectoryStart
                                          TrajectoryEnd
-                                         Circle deriving (Show)
+                                         CirclePath deriving (Show)
 data StraightMovement = StraightMovement Position2D Position2D deriving (Show)
 
 toSolidCircleImage :: PixelRGBA8 -> Radius -> VectorImage
@@ -205,11 +206,9 @@ moveAlongCircle radiusInMotion movement touchingCircle obstacles =
 endMovementOnCircle
     :: Radius -> CircularMovement -> Circle -> Obstacles -> Position2D
 endMovementOnCircle radiusInMotion movement touchedCircle obstacles =
-    let Obstacles bounds circles          = obstacles
-        Waypoint  _      waypointPosition = getNextWaypoint
-            radiusInMotion
-            movement
-            (Obstacles bounds (delete touchedCircle circles))
+    let otherObstacles = removeFromObstacles touchedCircle obstacles
+        waypoint = getNextWaypoint radiusInMotion movement otherObstacles
+        Waypoint _ waypointPosition = waypoint
     in  waypointPosition
 
 movePastCircle
@@ -220,25 +219,26 @@ movePastCircle
     -> Obstacles
     -> Position2D
 movePastCircle radiusInMotion movement touchedCircle endPosition obstacles =
-    let
-        Obstacles bounds circles               = obstacles
-        nonTouchedCircles                      = delete touchedCircle circles
-        CircularMovement _ (exit, _) _         = movement
-        Waypoint waypointType waypointPosition = getNextWaypoint
-            radiusInMotion
-            movement
-            (Obstacles bounds nonTouchedCircles)
-    in
-        case waypointType of
-            MovementFinished -> moveFromWaypoint
-                radiusInMotion
-                (getNextWaypoint radiusInMotion
-                                 (StraightMovement exit endPosition)
-                                 (Obstacles bounds nonTouchedCircles)
-                )
-                endPosition
-                (Obstacles bounds circles)
+    let otherObstacles = removeFromObstacles touchedCircle obstacles
+        waypoint = getNextWaypoint radiusInMotion movement otherObstacles
+        Waypoint waypointType waypointPosition = waypoint
+    in  case waypointType of
+            MovementFinished ->
+                let CircularMovement _ (exit, _) _ = movement
+                    exitMovement = StraightMovement exit endPosition
+                in  moveFromWaypoint
+                        radiusInMotion
+                        (getNextWaypoint radiusInMotion
+                                         exitMovement
+                                         otherObstacles
+                        )
+                        endPosition
+                        obstacles
             _ -> waypointPosition
+
+removeFromObstacles :: Circle -> Obstacles -> Obstacles
+removeFromObstacles circle (Obstacles bounds circles) =
+    Obstacles bounds (delete circle circles)
 
 getNextWaypoint :: Movement m => Radius -> m -> Obstacles -> Waypoint
 getNextWaypoint radiusInMotion movement (Obstacles bounds circles) = foldr

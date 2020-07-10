@@ -41,7 +41,8 @@ import           Graphics.Rasterific.Texture
 -- hit twice by a single bullet from other player, or hit by their own bullet
 -- immediately after firing.
 data IntersectedPlayer = IntersectedPlayer [BulletId] Player deriving (Show, Eq)
-data Movables = Movables BulletId [Bullet] [IntersectedPlayer]
+type NextBulletId = BulletId
+data Movables = Movables NextBulletId [Bullet] [IntersectedPlayer]
                          deriving (Show, Eq)
 type Pillar = Circle
 
@@ -77,16 +78,14 @@ createMatch =
         createPlayer' x dir playerId = IntersectedPlayer
             []
             (createPlayer (V2 x (height / 2)) dir playerId Nothing)
+        players =
+            [ createPlayer' xDistanceFromEdge           0  Blue
+            , createPlayer' (width - xDistanceFromEdge) pi Red
+            ]
+        obstacles = Obstacles bounds $ createPillars width height
     in
-        Match
-            (Movables
-                0
-                []
-                [ createPlayer' xDistanceFromEdge           0  Blue
-                , createPlayer' (width - xDistanceFromEdge) pi Red
-                ]
-            )
-            (Obstacles bounds $ createPillars width height)
+        Match (Movables 0 [] players) obstacles
+
 
 staticMatchImages :: Font -> [(ImageId, VectorImage)]
 staticMatchImages font =
@@ -126,12 +125,13 @@ staticScoreImages font =
 drawScore
     :: Position2D -> Player -> [(Rectangle Float, Either VectorImage ImageId)]
 drawScore midPos player =
-    let Player _ _ _ (Vitality deaths _) (PlayerId colorId _) = player
-    in  [ ( Rectangle (P $ midPos - scoreNumberSize / 2) scoreNumberSize
-                  -- use modulo since only single digit numbers are supported
-          , Right $ show colorId ++ show ((playerLives - deaths) `mod` 10)
-          )
-        ]
+    let
+        Player _ _ _ (Vitality deaths _) (PlayerId colorId _) = player
+        scorePosition = P $ midPos - scoreNumberSize / 2
+        -- use modulo since only single digit numbers are supported
+        scoreNumberId = show colorId ++ show ((playerLives - deaths) `mod` 10)
+    in
+        [(Rectangle scorePosition scoreNumberSize, Right scoreNumberId)]
 
 getPlayer :: IntersectedPlayer -> Player
 getPlayer (IntersectedPlayer _ player) = player
@@ -164,11 +164,12 @@ mapIntersectedPlayers f (Movables nextBulletId bullets intersectedPlayers) =
     Movables nextBulletId bullets (f intersectedPlayers)
 
 updatePlayers :: [Event] -> DeltaTime -> Obstacles -> Movables -> Movables
-updatePlayers events dt obstacles = mapIntersectedPlayers $ fullContextFoldr
-    ( applyConcat
-    $ (mapPlayer . updatePlayer events dt)
-    . addToObstacles obstacles
-    )
+updatePlayers events dt obstacles =
+    mapIntersectedPlayers
+        $ fullContextFoldr
+        $ applyConcat
+        $ (mapPlayer . updatePlayer events dt)
+        . addToObstacles obstacles
 
 -- Fold a list from the right with a function that depends on all folded values
 -- and all non-folded values when folding a single value.
