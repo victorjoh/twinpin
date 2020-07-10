@@ -85,16 +85,12 @@ spec = do
             $          limitPosition2D (V2 1 (-1)) (Bounds2D (0, 1) (2, 3))
             `shouldBe` V2 1 2
 
-    describe "limitPosition1D" $ do
+    describe "limit" $ do
         it "does not affect position already within the bounds"
-            $          limitPosition1D 2 (1, 3)
+            $          limit (1, 3) 2
             `shouldBe` 2
-        it "moves position below the bounds"
-            $          limitPosition1D 0 (1, 3)
-            `shouldBe` 1
-        it "moves position above the bounds"
-            $          limitPosition1D 5 (1, 3)
-            `shouldBe` 3
+        it "moves position below the bounds" $ limit (1, 3) 0 `shouldBe` 1
+        it "moves position above the bounds" $ limit (1, 3) 5 `shouldBe` 3
 
     describe "increaseBounds2D"
         $          it "increases the bounds equally on opposing sides"

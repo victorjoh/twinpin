@@ -2,7 +2,7 @@ module Game
     ( Game(..)
     , GameState(..)
     , Menu(..)
-    , InterruptionType(..)
+    , Action(..)
     , pauseMenu
     , redWinMenu
     , blueWinMenu
@@ -22,7 +22,7 @@ import           Visual
 import           Menu
 import           Player
 import           SDL.Raw.Types                  ( JoystickID )
-import           SDL                     hiding ( Paused )
+import           SDL
 import           Foreign.C.Types
 import           Graphics.Text.TrueType         ( Font )
 import           Codec.Picture.Types
@@ -35,16 +35,16 @@ import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as Rasterific
                                                 ( V2(..) )
 import           Graphics.Rasterific.Texture
-import           Data.Function                  ( (&) )
 
-data InterruptionType = Paused | GameOver deriving (Show, Eq)
 -- collect the events when interrupted to get the correct initial state when
 -- continuing
 data GameState = Running Match
-               | Interrupted Match InterruptionType Menu [Event]
+               | Interrupted Match (Menu Action) [Event]
                | Finished
                  deriving (Show, Eq)
 data Game = Game Time GameState deriving (Show, Eq)
+
+data Action = Resume | Restart | Quit deriving Eq
 
 optionsButtonId = 9
 psButtonId = 10
@@ -52,14 +52,19 @@ acceptButtonId = 0
 
 boundsImageId = "bounds"
 
-pauseMenu, redWinMenu, blueWinMenu, tieMenu :: Selection -> Menu
-pauseMenu = Menu [("paused", defaultTextColor)] "resume"
+instance Show Action where
+    show Resume  = "resume"
+    show Restart = "restart"
+    show Quit    = "quit"
+
+pauseMenu, redWinMenu, blueWinMenu, tieMenu :: Menu Action
+pauseMenu = Menu [("paused", defaultTextColor)] [Resume, Quit] 0
 redWinMenu = winMenu ("red", aimColor Red)
 blueWinMenu = winMenu ("blue", aimColor Blue)
 tieMenu = gameOverMenu [("it's a draw!", defaultTextColor)]
 
 winMenu playerText = gameOverMenu [playerText, (" wins!", defaultTextColor)]
-gameOverMenu header = Menu header "restart"
+gameOverMenu header = Menu header [Restart, Quit] 0
 
 createGame :: Game
 createGame = Game 0 $ Running createMatch
@@ -71,7 +76,7 @@ getStaticImages font winSize =
         scaledRectangle = moveRectangle offset $ scaleRectangle ratio matchRect
     in  drawBounds winSize scaledRectangle ratio : map
             (second $ renderScaledVectorImage ratio)
-            (  map (getStaticMenuImage font . (Continue &))
+            (  map (getStaticMenuImage font)
                    [pauseMenu, redWinMenu, blueWinMenu, tieMenu]
             ++ staticMatchImages font
             )
@@ -123,9 +128,9 @@ drawGame winSize (Game _ state) =
         ++ [(Rectangle (P $ V2 0 0) winSize, Right boundsImageId)]
 
 drawGameState :: GameState -> [(Rectangle Float, Either VectorImage ImageId)]
-drawGameState (Running match             ) = drawMatch match
-drawGameState (Interrupted match _ menu _) = drawMatch match ++ drawMenu menu
-drawGameState Finished                     = []
+drawGameState (Running match           ) = drawMatch match
+drawGameState (Interrupted match menu _) = drawMatch match ++ drawMenu menu
+drawGameState Finished                   = []
 
 updateGame :: [Event] -> Time -> Game -> Game
 updateGame events newTime oldGame =
@@ -138,25 +143,19 @@ updateGame events newTime oldGame =
 updateGameState :: [Event] -> DeltaTime -> GameState -> GameState
 updateGameState events passedTime (Running match) =
     Running $ updateMatch events passedTime match
-updateGameState events _ (Interrupted match intrType menu previousEvents) =
-    Interrupted match
-                intrType
-                (updateSelection events menu)
-                (previousEvents ++ events)
+updateGameState events _ (Interrupted match menu previousEvents) =
+    Interrupted match (updateSelection events menu) (previousEvents ++ events)
 updateGameState _ _ state = state
 
 switchGameState :: [Event] -> GameState -> GameState
-switchGameState events (Interrupted match intrType menu previousEvents) =
-    foldl' pausedEventToGameState
-           (Interrupted match intrType menu previousEvents)
-           events
+switchGameState events (Interrupted match menu previousEvents) =
+    foldl' pausedEventToGameState (Interrupted match menu previousEvents) events
 switchGameState events (Running match) =
     let winners = getWinners match
     in  if not $ null winners
             then Interrupted
                 match
-                GameOver
-                ((Continue &) $ case winners of
+                (case winners of
                     [Red ] -> redWinMenu
                     [Blue] -> blueWinMenu
                     _      -> tieMenu
@@ -178,18 +177,14 @@ pausedEventToGameState _         (Event _ (WindowClosedEvent _)) = Finished
 pausedEventToGameState gameState _                               = gameState
 
 chooseSelectedMenuEntryIf :: GameState -> Bool -> GameState
-chooseSelectedMenuEntryIf (Interrupted match intrType menu previousEvents) True
-    = let Menu _ _ selection = menu
-      in  case selection of
-              Continue -> Running
-                  (case intrType of
-                               -- set player ids to not loose joystick mappings
-                      GameOver -> setPlayerIds (getPlayerIds match) createMatch
-                               -- update so changes in input when paused will
-                               -- affect the match when unpaused
-                      _        -> updateMatch previousEvents 0 match
-                  )
-              _ -> Finished
+chooseSelectedMenuEntryIf (Interrupted match menu previousEvents) True =
+    case getSelection menu of
+        -- update so changes in input when paused will
+        -- affect the match when unpaused
+        Resume  -> Running $ updateMatch previousEvents 0 match
+        -- set player ids to not loose joystick mappings
+        Restart -> Running $ setPlayerIds (getPlayerIds match) createMatch
+        Quit    -> Finished
 chooseSelectedMenuEntryIf gameState True  = gameState
 chooseSelectedMenuEntryIf gameState False = gameState
 
@@ -199,12 +194,12 @@ runningEventToGameState (Running match) (Event _ (JoyButtonEvent buttonData)) =
     in  if (buttonId == optionsButtonId || buttonId == psButtonId)
                && buttonState
                == JoyButtonPressed
-            then Interrupted match Paused (pauseMenu Continue) []
+            then Interrupted match pauseMenu []
             else Running match
 runningEventToGameState (Running match) (Event _ (KeyboardEvent eventData)) =
     let KeyboardEventData _ motion _ (Keysym (Scancode code) _ _) = eventData
     in  if motion == Pressed && code == 41
-            then Interrupted match Paused (pauseMenu Continue) []
+            then Interrupted match pauseMenu []
             else Running match
 runningEventToGameState _ (Event _ (WindowClosedEvent _)) = Finished
 runningEventToGameState Finished _ = Finished
@@ -217,11 +212,8 @@ assignJoysticks newJoysticks (Game lastUpdatedTime state) =
 assignJoysticksToGameState :: [JoystickID] -> GameState -> GameState
 assignJoysticksToGameState newJoysticks (Running match) =
     Running $ assignJoysticksToMatch newJoysticks match
-assignJoysticksToGameState newJoysticks (Interrupted match intrType menu events)
-    = Interrupted (assignJoysticksToMatch newJoysticks match)
-                  intrType
-                  menu
-                  events
+assignJoysticksToGameState newJoysticks (Interrupted match menu events) =
+    Interrupted (assignJoysticksToMatch newJoysticks match) menu events
 assignJoysticksToGameState _ Finished = Finished
 
 isFinished :: Game -> Bool
