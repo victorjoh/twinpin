@@ -16,8 +16,5 @@ noKeyModifier = KeyModifier False
                             False
                             False
 
-getSelection :: Menu -> Selection
-getSelection (Menu _ _ selection) = selection
-
-basicMenu :: Selection -> Menu
-basicMenu = Menu [] ""
+basicMenu :: Int -> Menu String
+basicMenu = Menu [] ["a", "b"]

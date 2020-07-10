@@ -97,12 +97,10 @@ isLineCrossingVector2D v l =
               (getLineIntersection2D l (y, -x, 0))
 
 limitPosition2D :: Position2D -> Bounds2D -> Position2D
-limitPosition2D (V2 px py) (Bounds2D bx by) =
-    V2 (limitPosition1D px bx) (limitPosition1D py by)
+limitPosition2D (V2 px py) (Bounds2D bx by) = V2 (limit bx px) (limit by py)
 
-limitPosition1D :: Position1D -> Bounds1D -> Position1D
-limitPosition1D position (lowerBound, upperBound) =
-    max lowerBound $ min upperBound position
+limit :: Ord a => (a, a) -> a -> a
+limit (lowerBound, upperBound) value = max lowerBound $ min upperBound value
 
 increaseBounds2D :: Bounds2D -> Size2D -> Bounds2D
 increaseBounds2D (Bounds2D bx by) (V2 sx sy) =
