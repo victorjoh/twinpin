@@ -22,7 +22,7 @@ import           SpaceUtil                      ( )
 import           Data.Maybe                     ( fromJust )
 import           Data.List                      ( elemIndex )
 
-setSelection :: Action -> Menu Action -> Menu Action
+setSelection :: Eq a => a -> Menu a -> Menu a
 setSelection newSelection (Menu header choices _) =
     Menu header choices $ fromJust $ elemIndex newSelection choices
 
@@ -32,9 +32,9 @@ spec = do
             Match (Movables 0 [] []) (Obstacles (createBounds 1920 1080) [])
 
     describe "createGame"
-        $          it "creates a game in a running state"
+        $          it "creates a game in the main menu state"
         $          createGame
-        `shouldBe` Game 0 (Running createMatch)
+        `shouldBe` Game 0 (MainMenu mainMenu [])
 
     describe "drawGame" $ do
         it "draws a match when running"
@@ -249,12 +249,28 @@ spec = do
                                          createMatch
                                      )
         it
-                (  "quits the game when the x button is pressed when quit is "
-                ++ "selected in the menu"
+                (  "starts a new match when the x button is pressed when new "
+                ++ "game is selected in the main menu"
                 )
             $ let xPressed = createButtonPressedEvent 0 0
-                  menu     = setSelection Quit pauseMenu
+                  game     = Game 0 $ MainMenu mainMenu []
+              in  updateGame [xPressed] 1 game
+                      `shouldBe` Game 1 (Running createMatch)
+        it
+                (  "quits the game when the x button is pressed when quit is "
+                ++ "selected in the pause menu"
+                )
+            $ let xPressed = createButtonPressedEvent 0 0
+                  menu     = setSelection PauseQuit pauseMenu
                   game     = Game 0 $ Interrupted emptyMatch menu []
+              in  updateGame [xPressed] 1 game `shouldBe` Game 1 Finished
+        it
+                (  "quits the game when the x button is pressed when quit is "
+                ++ "selected in the main menu"
+                )
+            $ let xPressed = createButtonPressedEvent 0 0
+                  menu     = setSelection MainQuit mainMenu
+                  game     = Game 0 $ MainMenu menu []
               in  updateGame [xPressed] 1 game `shouldBe` Game 1 Finished
         it
                 (  "quits the game when enter is pressed when quit is selected "
@@ -265,17 +281,30 @@ spec = do
                       Pressed
                       False
                       (Keysym (Scancode 40) (Keycode 13) noKeyModifier)
-                  menu = setSelection Quit pauseMenu
+                  menu = setSelection PauseQuit pauseMenu
                   game = Game 0 $ Interrupted emptyMatch menu []
               in  updateGame [enterPressed] 1 game `shouldBe` Game 1 Finished
-        it "moves the selection down when the left thumbstick is moved down"
-            $ let stickDown = toEvent $ JoyAxisEventData 0 1 30000
-                  game      = Game 0 $ Interrupted emptyMatch pauseMenu []
-                  menu      = setSelection Quit pauseMenu
-              in  updateGame [stickDown] 1 game
-                      `shouldBe` Game
-                                     1
-                                     (Interrupted emptyMatch menu [stickDown])
+        it
+                (  "moves the selection down when the left thumbstick is moved "
+                ++ "down in interrupted mode"
+                )
+            $ let
+                  stickDown    = toEvent $ JoyAxisEventData 0 1 30000
+                  game         = Game 0 $ Interrupted emptyMatch pauseMenu []
+                  expectedMenu = setSelection PauseQuit pauseMenu
+                  expectedState =
+                      Interrupted emptyMatch expectedMenu [stickDown]
+              in
+                  updateGame [stickDown] 1 game `shouldBe` Game 1 expectedState
+        it
+                (  "moves the selection down when the left thumbstick is moved "
+                ++ "down in main menu mode"
+                )
+            $ let stickDown     = toEvent $ JoyAxisEventData 0 1 30000
+                  game          = Game 0 $ MainMenu mainMenu []
+                  expectedMenu  = setSelection MainQuit mainMenu
+                  expectedState = MainMenu expectedMenu []
+              in  updateGame [stickDown] 1 game `shouldBe` Game 1 expectedState
         it "does not update the match while the game is paused"
             $ let
                   bullet = createBullet (V2 100 300) 0 0
@@ -363,6 +392,23 @@ spec = do
                                          pauseMenu
                                          [moveDown, moveUp]
                                      )
+        it "removes joysticks that are disconnected when in main menu"
+            $ let
+                  game = Game 0 $ MainMenu mainMenu [8]
+                  joystickRemoved =
+                      toEvent $ JoyDeviceEventData JoyDeviceRemoved 8
+                  Game _ (MainMenu _ joystickIds) =
+                      updateGame [joystickRemoved] 1 game
+              in
+                  joystickIds `shouldBe` []
+        it
+                ("creates the game with the joysticks that were available in the "
+                ++ "main menu"
+                )
+            $ let game                   = Game 0 $ MainMenu mainMenu [8]
+                  xPressed               = createButtonPressedEvent 8 0
+                  Game _ (Running match) = updateGame [xPressed] 1 game
+              in  match `shouldBe` assignJoysticksToMatch [8] createMatch
 
     describe "assignJoysticks" $ do
         let player = IntersectedPlayer [] (createPlayer (V2 0 0) 0 Red Nothing)
@@ -376,6 +422,10 @@ spec = do
             $ let game = Game 0 $ Interrupted match pauseMenu []
                   Game _ (Interrupted newMatch _ _) = assignJoysticks [1] game
               in  getJoystickId (getFirstPlayer newMatch) `shouldBe` Just 1
+        it "keeps track of available joysticks when in the main menu"
+            $ let game = Game 0 $ MainMenu mainMenu [3]
+                  Game _ (MainMenu _ joystickIds) = assignJoysticks [1] game
+              in  joystickIds `shouldBe` [3, 1]
         it "does nothing when the game is already finished"
             $          assignJoysticks [1] (Game 0 Finished)
             `shouldBe` Game 0 Finished
