@@ -40,7 +40,7 @@ the following commands:
 sudo dnf install libicu-devel ncurses-devel
 git clone https://github.com/haskell/haskell-ide-engine --recursive
 cd haskell-ide-engine
-stack ./install.hs build
+stack ./install.hs hie
 ```
 
 Cabal is needed for Haskell IDE Engine to work properly. To install and update
