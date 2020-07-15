@@ -138,70 +138,59 @@ moveAlongBounds radiusInMotion movement (Obstacles bounds circles) =
 
 moveAlongCircle
     :: Radius -> StraightMovement -> Circle -> Obstacles -> Position2D
-moveAlongCircle radiusInMotion movement touchingCircle obstacles =
-    let
-        startPosition       = getStartPosition movement
-        trajectory          = increaseRadius radiusInMotion touchingCircle
-        (Circle trajectoryCenter trajectoryRadius) = trajectory
-        escapeDirection     = getEndPosition movement - startPosition
-        startPosition'      = startPosition - trajectoryCenter
-        startDirection      = startPosition' `rotate90Towards` escapeDirection
-        startAngle'         = vectorToAngle startPosition'
-        escapeDirectionUnit = toUnitVector escapeDirection
-        escapePos' =
-            trajectoryRadius
-                @*                escapeDirectionUnit
-                `rotate90Towards` startDirection
-        escapeAngle'            = vectorToAngle escapePos'
-        escapeAngleDisplacement = startAngle' `angleDifference2D` escapeAngle'
-        escapeAngleDistance     = abs escapeAngleDisplacement
-        possibleDistanceOnCircle =
-            scalarProjection escapeDirection startDirection
-        possibleAngleDistance = possibleDistanceOnCircle / trajectoryRadius
-    in
-        if abs (startDirection `dot` escapeDirection) < epsilon
-            then startPosition
-            else if escapeAngleDistance > possibleAngleDistance
-                then
-                    let
-                        endAngle =
-                            startAngle'
-                                - possibleAngleDistance
-                                * signum escapeAngleDisplacement
-                        endPosition =
-                            trajectoryRadius
-                                @* angleToVector endAngle
-                                +  trajectoryCenter
-                        circularMovement = CircularMovement
-                            (startPosition, startDirection)
-                            (endPosition  , escapeDirection)
-                            trajectory
-                    in
-                        endMovementOnCircle radiusInMotion
-                                            circularMovement
-                                            touchingCircle
-                                            obstacles
-                else
-                    let
-                        escapePos        = escapePos' + trajectoryCenter
-                        circularMovement = CircularMovement
-                            (startPosition, startDirection)
-                            (escapePos    , escapeDirection)
-                            trajectory
-                        distanceMovedOnCircle =
-                            escapeAngleDistance * trajectoryRadius
-                        movementDistanceLeft =
-                            possibleDistanceOnCircle - distanceMovedOnCircle
-                        endPosition =
-                            escapePos
-                                +  movementDistanceLeft
-                                @* escapeDirectionUnit
-                    in
-                        movePastCircle radiusInMotion
-                                       circularMovement
-                                       touchingCircle
-                                       endPosition
-                                       obstacles
+moveAlongCircle radiusInMotion movement touchingCircle obstacles
+    | abs (startDirection `dot` escapeDirection) < epsilon
+    = startPosition
+    | escapeAngleDistance > possibleAngleDistance
+    = let
+          endAngle =
+              startAngle'
+                  - possibleAngleDistance
+                  * signum escapeAngleDisplacement
+          endPosition =
+              trajectoryRadius @* angleToVector endAngle + trajectoryCenter
+          circularMovement = CircularMovement
+              (startPosition, startDirection)
+              (endPosition  , escapeDirection)
+              trajectory
+      in
+          endMovementOnCircle radiusInMotion
+                              circularMovement
+                              touchingCircle
+                              obstacles
+    | otherwise
+    = let
+          escapePos        = escapePos' + trajectoryCenter
+          circularMovement = CircularMovement
+              (startPosition, startDirection)
+              (escapePos    , escapeDirection)
+              trajectory
+          distanceMovedOnCircle = escapeAngleDistance * trajectoryRadius
+          movementDistanceLeft =
+              possibleDistanceOnCircle - distanceMovedOnCircle
+          endPosition = escapePos + movementDistanceLeft @* escapeDirectionUnit
+      in
+          movePastCircle radiusInMotion
+                         circularMovement
+                         touchingCircle
+                         endPosition
+                         obstacles
+  where
+    startPosition       = getStartPosition movement
+    trajectory          = increaseRadius radiusInMotion touchingCircle
+    (Circle trajectoryCenter trajectoryRadius) = trajectory
+    escapeDirection     = getEndPosition movement - startPosition
+    startPosition'      = startPosition - trajectoryCenter
+    startDirection      = startPosition' `rotate90Towards` escapeDirection
+    startAngle'         = vectorToAngle startPosition'
+    escapeDirectionUnit = toUnitVector escapeDirection
+    escapePos' =
+        trajectoryRadius @* escapeDirectionUnit `rotate90Towards` startDirection
+    escapeAngle'             = vectorToAngle escapePos'
+    escapeAngleDisplacement  = startAngle' `angleDifference2D` escapeAngle'
+    escapeAngleDistance      = abs escapeAngleDisplacement
+    possibleDistanceOnCircle = scalarProjection escapeDirection startDirection
+    possibleAngleDistance    = possibleDistanceOnCircle / trajectoryRadius
 
 endMovementOnCircle
     :: Radius -> CircularMovement -> Circle -> Obstacles -> Position2D
@@ -432,18 +421,17 @@ getCircleCircleIntersections r1 (Circle (V2 x2 y2) r2) =
 -- The circle is centered in origin. Converted from:
 -- https://cp-algorithms.com/geometry/circle-line-intersection.html
 getCircleLineIntersections :: Radius -> Line2D -> [Position2D]
-getCircleLineIntersections r l =
-    let (a, b, c)  = l
-        (V2 x0 y0) = getPositionClosestToOrigin l
-    in  if c * c > r * r * (a * a + b * b) + epsilon
-            then []
-            else if abs (c * c - r * r * (a * a + b * b)) < epsilon
-                then [V2 x0 y0]
-                else
-                    let d  = r * r - c * c / (a * a + b * b)
-                        m  = sqrt (d / (a * a + b * b))
-                        ax = x0 + b * m
-                        bx = x0 - b * m
-                        ay = y0 - a * m
-                        by = y0 + a * m
-                    in  [V2 ax ay, V2 bx by]
+getCircleLineIntersections r l@(a, b, c)
+    | c * c > r * r * (a * a + b * b) + epsilon
+    = []
+    | abs (c * c - r * r * (a * a + b * b)) < epsilon
+    = [V2 x0 y0]
+    | otherwise
+    = let d  = r * r - c * c / (a * a + b * b)
+          m  = sqrt (d / (a * a + b * b))
+          ax = x0 + b * m
+          bx = x0 - b * m
+          ay = y0 - a * m
+          by = y0 + a * m
+      in  [V2 ax ay, V2 bx by]
+    where (V2 x0 y0) = getPositionClosestToOrigin l
