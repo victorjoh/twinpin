@@ -19,12 +19,10 @@ import           Foreign.Ptr                    ( nullPtr )
 import           MatchUtil
 import           Approx
 import           SpaceUtil                      ( )
-import           Data.Maybe                     ( fromJust )
-import           Data.List                      ( elemIndex )
 
 setSelection :: Eq a => a -> Menu a -> Menu a
 setSelection newSelection (Menu header choices _) =
-    Menu header choices $ fromJust $ elemIndex newSelection choices
+    Menu header choices newSelection
 
 spec :: Spec
 spec = do

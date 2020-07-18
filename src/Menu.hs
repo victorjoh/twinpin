@@ -10,13 +10,14 @@ import           Graphics.Rasterific     hiding ( V2(..) )
 import qualified Graphics.Rasterific           as Rasterific
                                                 ( V2(..) )
 import           Graphics.Rasterific.Texture
-import           Data.List                      ( foldl' )
+import           Data.List                      (elemIndex,  foldl' )
 import           Control.Monad                  ( zipWithM_ )
+import Data.Maybe ( fromMaybe )
 
 type Header = [(String, PixelRGBA8)]
 -- type ContinueName = String
 -- data Selection = Continue | Quit deriving (Show, Eq)
-data Menu a = Menu Header [a] Int deriving (Show, Eq)
+data Menu a = Menu Header [a] a deriving (Show, Eq)
 
 menuSize :: Size2D
 menuSize = V2 540 414
@@ -51,20 +52,23 @@ menuRows font choices = zipWithM_ (menuRow font) choices $ iterate (+ 90) 225
 menuRow :: Show a => Font -> a -> Position1D -> Drawing PixelRGBA8 ()
 menuRow font row y = printTextAt font textSize (Rasterific.V2 144 y) $ show row
 
-drawMenu :: Menu a -> [(Rectangle Float, Either VectorImage ImageId)]
-drawMenu (Menu header _ selection) =
-    let selectionPosition = fromIntegral $ 540 + selection * 90
+drawMenu :: Eq a => Menu a -> [(Rectangle Float, Either VectorImage ImageId)]
+drawMenu menu@(Menu header _ _) =
+    let selectionPosition = fromIntegral $ 540 + (getSelectionIndex menu) * 90
     in  [ (Rectangle (P $ V2 690 333) menuSize, Right $ getMenuImageId header)
         , drawBullet $ createBullet (V2 807 selectionPosition) 0 (-1)
         ]
 
-getSelection :: Menu a -> a
-getSelection (Menu _ choices selection) = choices !! selection
+getSelectionIndex :: Eq a => Menu a -> Int
+getSelectionIndex (Menu _ choices selection) = fromMaybe 0 $ elemIndex selection choices
 
-updateSelection :: [Event] -> Menu a -> Menu a
-updateSelection events (Menu header choices previous) =
-    Menu header choices
-        $ foldl' (eventToSelection $ length choices) previous events
+getSelection :: Menu a -> a
+getSelection (Menu _ _ selection) = selection
+
+updateSelection :: Eq a => [Event] -> Menu a -> Menu a
+updateSelection events menu@(Menu header choices _) =
+    Menu header choices $ choices !!
+        foldl' (eventToSelection $ length choices) (getSelectionIndex menu) events
 
 eventToSelection :: Int -> Int -> Event -> Int
 eventToSelection nbrOfChoices current event =

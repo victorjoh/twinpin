@@ -16,5 +16,5 @@ noKeyModifier = KeyModifier False
                             False
                             False
 
-basicMenu :: Int -> Menu String
+basicMenu :: String -> Menu String
 basicMenu = Menu [] ["a", "b"]

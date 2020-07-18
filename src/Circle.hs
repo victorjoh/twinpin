@@ -43,7 +43,7 @@ data WaypointType = CircleCollision Circle | BoundsCollision | MovementFinished
                     deriving (Show)
 data Obstacles = Obstacles Bounds2D [Circle] deriving (Show, Eq)
 
-class Show m => Movement m where
+class Movement m where
     getStartPosition, getEndPosition :: m -> Position2D
     collideWithBounds :: Radius -> m -> Bounds2D -> Maybe Waypoint
     collideWithCircles :: Radius -> m -> [Circle] -> Maybe Waypoint
@@ -434,4 +434,4 @@ getCircleLineIntersections r l@(a, b, c)
           ay = y0 - a * m
           by = y0 + a * m
       in  [V2 ax ay, V2 bx by]
-    where (V2 x0 y0) = getPositionClosestToOrigin l
+    where V2 x0 y0 = getPositionClosestToOrigin l
