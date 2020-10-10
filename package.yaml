@@ -84,6 +84,7 @@ tests:
     - -with-rtsopts=-N
     - -W
     - -Wname-shadowing
+    - -fexternal-interpreter
     dependencies:
     - twinpin
     - hspec
