@@ -29,28 +29,10 @@ and processor architecture
 
 ## Suggested development environment
 To develop twinpin, I use Visual Studio Code with the following extensions:
-* [Haskell Language Server
-  (alanz.vscode-hie-server)](https://marketplace.visualstudio.com/items?itemName=alanz.vscode-hie-server)
+* [Haskell
+  (haskell.haskell)](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)
 * [Rewrap
   (stkb.rewrap)](https://marketplace.visualstudio.com/items?itemName=stkb.rewrap)
-
-Haskell Language Server has a requirement on Haskell IDE Engine. Build it with
-the following commands:
-```
-sudo dnf install libicu-devel ncurses-devel
-git clone https://github.com/haskell/haskell-ide-engine --recursive
-cd haskell-ide-engine
-stack ./install.hs build
-```
-
-Cabal is needed for Haskell IDE Engine to work properly. To install and update
-cabal, run the commands below. See [this
-issue](https://github.com/haskell/haskell-ide-engine/issues/658) for more
-information.
-```
-stack install cabal-install
-cabal update
-```
 
 The Twinpin tests uses hspec-discover. It needs to be installed globally with
 the command below. See [this
@@ -58,6 +40,15 @@ issue](https://github.com/haskell/haskell-ide-engine/issues/1500) for more
 information.
 ```
 stack install hspec-discover
+```
+
+Cabal may be needed for Haskell IDE Engine to work properly. To install and
+update cabal, run the commands below. See [this
+issue](https://github.com/haskell/haskell-ide-engine/issues/658) for more
+information.
+```
+stack install cabal-install
+cabal update
 ```
 
 ## Twinpin code architecture
