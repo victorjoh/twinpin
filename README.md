@@ -9,8 +9,9 @@ release](https://github.com/victorjoh/twinpin/releases/latest), or build from
 source by following the instructions below.
 
 ## Build dependencies
-Stack is used to build the project. Stack will download most of the other build
-dependencies but there are some manual steps required to get SDL2 working.
+[Stack](https://docs.haskellstack.org/en/stable/README/) is used to build the
+project. Stack will download most of the other build dependencies but there are
+some manual steps required to get SDL2 working.
 
 ### Windows specific setup
 To set up SDL2 for Windows, follow step 1-4 in [this Reddit
@@ -61,7 +62,7 @@ shown, the image would be too cluttered if they were.
 ![twinpin module dependencies](doc/module-dependencies.svg)
 
 Below [Game] in the graph are:
-* [Match], which manages interations between all objects in a match.
+* [Match], which manages interactions between all objects in a match.
 * [Menu], which can draw a pause menu that can be used to quit the game.
 * [Player], which updates a player's state. A player is represented by a circle
   visually. Given the trigger input a player will fire a bullet.
