@@ -42,6 +42,7 @@ import           Graphics.Rasterific.Texture
 
 -- collect the events when interrupted to get the correct initial state when
 -- continuing
+--data GameState = Start MainMenu
 data GameState = MainMenu (Menu MainAction) [JoystickID]
                | Running Match
                | Interrupted Match (Menu InterruptedAction) [Event]
@@ -51,6 +52,21 @@ data Game = Game Time GameState deriving (Show, Eq)
 
 data MainAction = NewMatch | MainQuit deriving Eq
 data InterruptedAction = Resume | Restart | PauseQuit deriving Eq
+
+--data MainMenu = MainMenu [JoystickID]
+--
+--data Menu a = Menu a [a]
+--data MainNode = NewGame [MainNode] | Quit [MainNode] 
+--              | NumberOfPlayers Int | Start | Back | Yes | No
+--
+--mainMenu' :: Root No [
+--        NewGame [
+--            NumberOfPlayers 2,
+--            Start,
+--            Back
+--        ],
+--        Quit [No, Yes]
+--    ]
 
 optionsButtonId = 9
 psButtonId = 10
@@ -79,9 +95,9 @@ blueWinMenu = winMenu ("blue", aimColor Blue)
 tieMenu = uncoloredMenu "it's a draw!" [Restart, PauseQuit]
 
 uncoloredMenu headerText choices =
-    Menu [(headerText, defaultTextColor)] choices 0
+    Menu [(headerText, defaultTextColor)] choices (head choices)
 winMenu playerText =
-    Menu [playerText, (" wins!", defaultTextColor)] [Restart, PauseQuit] 0
+    Menu [playerText, (" wins!", defaultTextColor)] [Restart, PauseQuit] Restart
 
 createGame :: Game
 createGame = Game 0 $ MainMenu mainMenu []
