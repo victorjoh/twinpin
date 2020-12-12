@@ -3,7 +3,7 @@ module MenuSpec where
 import           Test.Hspec
 import           Menu
 import           Bullet
-import           PlayerUtil
+import           EventUtil
 import           MenuUtil
 import           SDL.Event
 import           SDL
@@ -66,3 +66,4 @@ spec = do
                       (Keysym (Scancode 82) (Keycode 1073741906) noKeyModifier)
               in  getSelection (updateSelection [arrowUp] $ basicMenu 0)
                       `shouldBe` "a"
+        it "moves to a sub page when enter is pressed "

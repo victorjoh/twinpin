@@ -67,28 +67,6 @@ getRequiredStickPosition :: Vector1D -> Time -> Integer
 getRequiredStickPosition distance time =
     round $ distance / (fromIntegral time * axisPositionToVelocity)
 
-class EventContent c where
-    toEventPayload :: c -> EventPayload
-    toEvent :: c -> Event
-    toEvent = Event 0 . toEventPayload
-    toEvents :: [c] -> [Event]
-    toEvents = map toEvent
-
-instance EventContent JoyAxisEventData where
-    toEventPayload = JoyAxisEvent
-
-instance EventContent JoyButtonEventData where
-    toEventPayload = JoyButtonEvent
-
-instance EventContent JoyHatEventData where
-    toEventPayload = JoyHatEvent
-
-instance EventContent KeyboardEventData where
-    toEventPayload = KeyboardEvent
-
-instance EventContent JoyDeviceEventData where
-    toEventPayload = JoyDeviceEvent
-
 createMoveRightEvent :: JoystickID -> Vector1D -> Word32 -> Event
 createMoveRightEvent = createMoveEvent 0
 
