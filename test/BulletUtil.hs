@@ -1,8 +1,8 @@
 module BulletUtil where
 
-import           Bullet
-import           Space
-import           CircleUtil
+import Bullet
+import CircleUtil
+import Space
 
 getBulletPosition :: Bullet -> Position2D
 getBulletPosition bullet = getCirclePosition $ bulletToCircle bullet
